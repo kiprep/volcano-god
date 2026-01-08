@@ -1,9 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 
-console.log('Script loaded!');
-console.log('THREE version:', THREE.REVISION);
-
 // Debug mode
 const debugMode = true;
 
@@ -57,9 +54,6 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
-console.log('Renderer created and added to DOM');
-console.log('Canvas size:', window.innerWidth, 'x', window.innerHeight);
-
 // Initialize Cannon.js physics
 const world = new CANNON.World();
 world.gravity.set(0, -30, 0); // Even stronger gravity for faster lava drop-off
@@ -109,7 +103,6 @@ const volcanoHeight = 30; // Shorter for flatter profile
 
 // Create volcano physics body AND visual mesh together so they match perfectly
 const volcanoSegments = 10;
-const debugVisualization = false; // Set to true to show debug wireframes
 
 // Create a material for the volcano
 const volcanoMaterial = new THREE.MeshStandardMaterial({
@@ -167,11 +160,7 @@ for (let i = 0; i < volcanoSegments; i++) {
     visualMesh.receiveShadow = true;
     visualMesh.castShadow = true;
     scene.add(visualMesh);
-
-    console.log(`Segment ${i}: yPos=${yPosPhysics.toFixed(2)}, topR=${topSegmentRadius.toFixed(2)}, bottomR=${bottomSegmentRadius.toFixed(2)}`);
 }
-
-console.log('Volcano built from y=0 to y=' + volcanoHeight);
 
 // Create villages (pink and lime green cylinders) near the shoreline
 const villageRadius = 8; // Much larger
@@ -201,8 +190,6 @@ village1.receiveShadow = true;
 village1.castShadow = true;
 scene.add(village1);
 
-console.log('Village 1 created at:', village1.position);
-
 // Village 2 (Lime Green) - opposite side (225 degrees)
 const village2Angle = Math.PI / 4 + Math.PI; // 225 degrees (opposite side)
 const village2X = Math.cos(village2Angle) * villageDistanceFromCenter;
@@ -220,8 +207,6 @@ village2.position.set(village2X, villageHeightOnSlope - villageHeight * 0.25, vi
 village2.receiveShadow = true;
 village2.castShadow = true;
 scene.add(village2);
-
-console.log('Village 2 created at:', village2.position);
 
 // Keep reference for backward compatibility
 const village = village1;
@@ -258,9 +243,6 @@ const waypoint2v1Height = getIslandSurfaceHeight(waypoint2v1X, waypoint2v1Z); //
 const waypoint1v1 = new THREE.Vector3(waypoint1v1X, waypoint1v1Height, waypoint1v1Z);
 const waypoint2v1 = new THREE.Vector3(waypoint2v1X, waypoint2v1Height, waypoint2v1Z);
 
-console.log('Village 1 Waypoint 1:', waypoint1v1);
-console.log('Village 1 Waypoint 2:', waypoint2v1);
-
 // Create waypoints for Village 2 (Purple)
 const waypoint1v2Angle = village2Angle - Math.PI / 6; // To the left of village 2
 const waypoint1v2Distance = volcanoRadius * 0.45; // Closer to center (higher up)
@@ -276,9 +258,6 @@ const waypoint2v2Height = getIslandSurfaceHeight(waypoint2v2X, waypoint2v2Z); //
 
 const waypoint1v2 = new THREE.Vector3(waypoint1v2X, waypoint1v2Height, waypoint1v2Z);
 const waypoint2v2 = new THREE.Vector3(waypoint2v2X, waypoint2v2Height, waypoint2v2Z);
-
-console.log('Village 2 Waypoint 1:', waypoint1v2);
-console.log('Village 2 Waypoint 2:', waypoint2v2);
 
 // Debug visualization for waypoints
 if (debugMode) {
@@ -322,6 +301,33 @@ if (debugMode) {
 // Keep backward compatibility
 const waypoint1 = waypoint1v1;
 const waypoint2 = waypoint2v1;
+
+// Store trees (needed before spawning)
+const trees = [];
+
+// Physics material for trees (needed before spawning)
+const treeMat = new CANNON.Material('tree');
+const treeLavaContact = new CANNON.ContactMaterial(treeMat, lavaMat, {
+    friction: 50.0,
+    restitution: 0.0,
+});
+world.addContactMaterial(treeLavaContact);
+
+// Spawn trees randomly around the island
+// Trees placed in a band from 25% to 60% of volcano radius
+const treeCount = 30;
+for (let i = 0; i < treeCount; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const minDistance = volcanoRadius * 0.25;
+    const maxDistance = volcanoRadius * 0.60;
+    const distance = minDistance + Math.random() * (maxDistance - minDistance);
+
+    const treeX = Math.cos(angle) * distance;
+    const treeZ = Math.sin(angle) * distance;
+    const treeY = getIslandSurfaceHeight(treeX, treeZ);
+
+    createTree(new THREE.Vector3(treeX, treeY, treeZ));
+}
 
 // Create ground/water around volcano
 const groundGeometry = new THREE.CircleGeometry(150, 32);
@@ -367,7 +373,7 @@ const embers = [];
 const particles = [];
 
 // Lava types array for cycling
-const lavaTypes = ['boulder', 'spray', 'liquid'];
+const lavaTypes = ['boulder', 'spray'];
 
 // Physics material for villagers
 const villagerMat = new CANNON.Material('villager');
@@ -387,13 +393,83 @@ world.addContactMaterial(villagerLavaContact);
 world.addContactMaterial(villagerVolcanoContact);
 world.addContactMaterial(villagerGroundContact);
 
+// Create a palm tree
+function createTree(position) {
+    const trunkHeight = 4.5; // Same as princess height
+    const trunkRadius = 0.3;
+    const frondLength = trunkHeight / 2; // 2.25 units
+
+    // Create trunk
+    const trunkGeometry = new THREE.CylinderGeometry(trunkRadius, trunkRadius, trunkHeight, 8);
+    const trunkMaterial = new THREE.MeshStandardMaterial({
+        color: 0x8b4513, // Brown
+        roughness: 0.9,
+    });
+    const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+    trunk.position.copy(position);
+    trunk.position.y += trunkHeight / 2; // Center at surface
+    trunk.position.y += trunkHeight * 0.5; // Move up 50% more
+    trunk.castShadow = true;
+    trunk.receiveShadow = true;
+    scene.add(trunk);
+
+    // Create three palm fronds (flattened pyramids) radiating outward
+    const frondGroup = new THREE.Group();
+    const frondAngles = [0, Math.PI * 2 / 3, Math.PI * 4 / 3]; // 120 degrees apart
+
+    for (let i = 0; i < 3; i++) {
+        // Flattened cone for palm frond
+        const frondGeometry = new THREE.ConeGeometry(frondLength * 0.3, frondLength, 4);
+        // Scale it to flatten
+        frondGeometry.scale(1, 1, 0.3); // Flatten on Z axis
+
+        const frondMaterial = new THREE.MeshStandardMaterial({
+            color: 0x228b22, // Forest green
+            roughness: 0.8,
+        });
+        const frond = new THREE.Mesh(frondGeometry, frondMaterial);
+
+        const angle = frondAngles[i];
+
+        // Position outward from center (half the frond length since point is at center)
+        const offsetDistance = frondLength / 2;
+        frond.position.set(
+            Math.cos(angle) * offsetDistance,
+            trunkHeight, // At top of trunk
+            Math.sin(angle) * offsetDistance
+        );
+
+        // Rotate 90 degrees onto side, then rotate around to point outward
+        frond.rotation.z = Math.PI / 2; // Tip onto side (horizontal)
+        frond.rotation.y = angle; // Rotate to point outward
+
+        frond.castShadow = true;
+        frondGroup.add(frond);
+    }
+
+    frondGroup.position.copy(position);
+    frondGroup.position.y += trunkHeight * 0.5; // Move up 50% to match trunk
+    scene.add(frondGroup);
+
+    // Physics - cylinder for trunk collision
+    const shape = new CANNON.Cylinder(trunkRadius * 1.5, trunkRadius * 1.5, trunkHeight, 8);
+    const body = new CANNON.Body({
+        mass: 0, // Static object
+        material: treeMat,
+    });
+    body.addShape(shape);
+    body.position.copy(position);
+    body.position.y += trunkHeight / 2; // Center at surface
+    body.position.y += trunkHeight * 0.5; // Move up 50% more
+    world.addBody(body);
+
+    trees.push({ trunk, frondGroup, body, position: position.clone() });
+}
+
 // Create a villager (cone shape)
 function createVillager(position, isPrincess = false, villageId = 1) {
     const villagerHeight = 1.5;
     const villagerRadius = 0.4;
-
-    // Debug logging
-    console.log('Creating villager at position:', position, 'isPrincess:', isPrincess, 'villageId:', villageId);
 
     // Visual cone with color based on type - princess is MUCH brighter and BIGGER
     const princessScale = isPrincess ? 3.0 : 1.0; // Princess is 3x bigger!
@@ -409,8 +485,6 @@ function createVillager(position, isPrincess = false, villageId = 1) {
     mesh.position.y += villagerHeight * princessScale / 2; // Adjust for cone base
     mesh.castShadow = true;
     scene.add(mesh);
-
-    console.log('Villager mesh position after adjustment:', mesh.position);
 
     // Physics - use cylinder for simpler collision with no bounce
     const shape = new CANNON.Cylinder(villagerRadius, villagerRadius, villagerHeight, 8);
@@ -448,10 +522,6 @@ function createVillager(position, isPrincess = false, villageId = 1) {
         ritualDuration: 3.0, // 3 seconds
         ritualStartY: 0
     };
-
-    // Verify villager spawns above island
-    const spawnCheck = isAboveIsland(position.x, position.y, position.z);
-    console.log(`Villager spawn check - Above island: ${spawnCheck}, Y: ${position.y}, Surface: ${getIslandSurfaceHeight(position.x, position.z)}`);
 
     villagers.push(villager);
     return villager;
@@ -536,16 +606,48 @@ function createRedExplosion(position) {
     createParticles(position, 15, 0xaa0000, 10, 1.5, Math.PI); // Dark red, very fast
 }
 
+// Create lava smoke trail (small black particles)
+function createLavaSmoke(position) {
+    // Small puffs of dark smoke
+    const size = 0.1 + Math.random() * 0.2;
+    const geometry = new THREE.SphereGeometry(size, 4, 4);
+    const material = new THREE.MeshBasicMaterial({
+        color: 0x222222,
+        transparent: true,
+        opacity: 0.8,
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.copy(position);
+    // Add slight random offset
+    mesh.position.x += (Math.random() - 0.5) * 0.3;
+    mesh.position.y += (Math.random() - 0.5) * 0.3;
+    mesh.position.z += (Math.random() - 0.5) * 0.3;
+    scene.add(mesh);
+
+    // Very slow upward drift
+    const velocity = new THREE.Vector3(
+        (Math.random() - 0.5) * 0.2,
+        0.5, // Slowly rise
+        (Math.random() - 0.5) * 0.2
+    );
+
+    particles.push({
+        mesh,
+        velocity,
+        age: 0,
+        lifetime: 1.0, // Fade out in 1 second
+        initialOpacity: 0.8
+    });
+}
+
 // Spawn a group of villagers from a specific village
 function spawnVillagerGroup(villageId = 1) {
     if (gameState.gameOver || !gameState.started) {
-        console.log('Game not started or game over - not spawning villagers');
         return;
     }
 
     const villagePos = villageId === 1 ? village1.position : village2.position;
     const groupSize = 3 + Math.floor(Math.random() * 3); // 3-5 villagers
-    console.log(`Spawning ${groupSize} villagers (1 princess) at village ${villageId} position:`, villagePos);
 
     for (let i = 0; i < groupSize; i++) {
         // Princess spawns at center (i = middle index), normal villagers around her
@@ -576,29 +678,45 @@ function spawnVillagerGroup(villageId = 1) {
         );
 
         const winHeight = volcanoHeight * 0.9;
-        console.log(`  Spawning villager ${i} at:`, spawnPos, `surface height: ${surfaceHeight}, win height: ${winHeight}, isPrincess: ${isPrincess}`);
 
         // Safety check - don't spawn above win height!
         if (spawnPos.y >= winHeight) {
-            console.warn('WARNING: Spawn position too high! Adjusting...');
             spawnPos.y = winHeight - 5;
         }
 
-        const newVillager = createVillager(spawnPos, isPrincess, villageId);
-        console.log(`  Created villager, isPrincess flag: ${newVillager.isPrincess}, villageId: ${newVillager.villageId}`);
+        createVillager(spawnPos, isPrincess, villageId);
     }
-
-    console.log(`Total villagers now: ${villagers.length}`);
 }
 
 // Create a boulder
 function createBoulder(position, velocity) {
     const radius = 0.5;
     const geometry = new THREE.SphereGeometry(radius, 16, 16);
+
+    // Add vertex colors for flecks
+    const colors = [];
+    const positions = geometry.attributes.position;
+    for (let i = 0; i < positions.count; i++) {
+        const rand = Math.random();
+        if (rand < 0.15) {
+            // Black flecks (15% chance)
+            colors.push(0.1, 0.05, 0.0);
+        } else if (rand < 0.3) {
+            // Yellow flecks (15% chance)
+            colors.push(1.0, 0.9, 0.2);
+        } else {
+            // Orange-red base (70%)
+            colors.push(1.0, 0.5 + Math.random() * 0.2, 0.0);
+        }
+    }
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
     const material = new THREE.MeshStandardMaterial({
-        color: 0xffaa00, // Bright orange-yellow
+        color: 0xffffff, // White base to let vertex colors show through
         emissive: 0xff4400,
         emissiveIntensity: 1.5,
+        vertexColors: true,
+        roughness: 0.8,
     });
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.copy(position);
@@ -636,10 +754,31 @@ function createSpray(position, velocity) {
     for (let i = 0; i < particleCount; i++) {
         const radius = 0.15;
         const geometry = new THREE.SphereGeometry(radius, 8, 8);
+
+        // Add vertex colors for flecks
+        const colors = [];
+        const positions = geometry.attributes.position;
+        for (let j = 0; j < positions.count; j++) {
+            const rand = Math.random();
+            if (rand < 0.15) {
+                // Black flecks (15% chance)
+                colors.push(0.1, 0.05, 0.0);
+            } else if (rand < 0.3) {
+                // Yellow flecks (15% chance)
+                colors.push(1.0, 0.9, 0.2);
+            } else {
+                // Orange-red base (70%)
+                colors.push(1.0, 0.6 + Math.random() * 0.2, 0.0);
+            }
+        }
+        geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
         const material = new THREE.MeshStandardMaterial({
-            color: 0xffcc00, // Bright yellow-orange
+            color: 0xffffff, // White base to let vertex colors show through
             emissive: 0xff6600,
             emissiveIntensity: 1.2,
+            vertexColors: true,
+            roughness: 0.8,
         });
         const mesh = new THREE.Mesh(geometry, material);
         mesh.position.copy(position);
@@ -677,12 +816,6 @@ function createSpray(position, velocity) {
     }
 }
 
-// Stub for liquid lava (to be implemented later)
-function createLiquidLava(position, velocity) {
-    console.log('Liquid lava not yet implemented');
-    // TODO: Implement flowing lava mechanic
-}
-
 // Fire lava based on current type
 function fireLava() {
     // Check if we have enough lava
@@ -716,8 +849,6 @@ function fireLava() {
         createBoulder(position, velocity);
     } else if (gameState.lavaType === 'spray') {
         createSpray(position, velocity);
-    } else if (gameState.lavaType === 'liquid') {
-        createLiquidLava(position, velocity);
     }
 }
 
@@ -746,7 +877,6 @@ function updateUI() {
 // Game over function
 function triggerGameOver() {
     gameState.gameOver = true;
-    console.log('GAME OVER! Princess reached the top!');
 
     // Show game over screen
     const gameOverDiv = document.createElement('div');
@@ -781,7 +911,6 @@ function triggerGameOver() {
     document.body.appendChild(gameOverDiv);
 
     document.getElementById('restart-btn').addEventListener('click', () => {
-        console.log('Restart button clicked');
         location.reload(); // Simple restart - reload the page
     });
 
@@ -880,25 +1009,53 @@ window.addEventListener('resize', () => {
 let lastFireTime = 0;
 const fireRate = 200; // milliseconds between shots
 
-// Solidify lava when it stops moving
-function solidifyLava(obj) {
-    // Create impact particles at solidification point
-    createImpactParticles(obj.body.position);
+// Solidify lava when it stops moving or hits something collidable
+function solidifyLava(obj, hitCollidable = false) {
+    // If hit something collidable, sink into ground and turn black
+    if (hitCollidable) {
+        const surfaceHeight = getIslandSurfaceHeight(obj.body.position.x, obj.body.position.z);
+        const lavaRadius = obj.type === 'boulder' ? 0.5 : 0.15; // Radius of lava sphere
 
-    // Remove from physics world (freezes it in place)
+        // Set center to surface level, then move up by 100% (one full radius)
+        obj.body.position.y = surfaceHeight + lavaRadius;
+        obj.mesh.position.copy(obj.body.position);
+
+        // Turn completely black (cooled)
+        obj.mesh.material = obj.mesh.material.clone(); // Clone material to avoid affecting other objects
+        obj.mesh.material.color.setHex(0x1a1a1a); // Very dark gray (not pure black, so it's still visible)
+        obj.mesh.material.emissive.setHex(0x000000); // No glow
+        obj.mesh.material.emissiveIntensity = 0;
+        obj.mesh.material.needsUpdate = true;
+    } else {
+        // Normal solidification - impact particles and dark gray
+        createImpactParticles(obj.body.position);
+
+        // Change to dark gray
+        obj.mesh.material = obj.mesh.material.clone(); // Clone material
+        obj.mesh.material.color.setHex(0x3a3a3a); // Dark gray
+        obj.mesh.material.emissive.setHex(0x000000); // No glow
+        obj.mesh.material.emissiveIntensity = 0;
+        obj.mesh.material.needsUpdate = true;
+    }
+
+    obj.isHot = false; // No longer dangerous to villagers
+
+    // Remove from physics world and active lava
     world.removeBody(obj.body);
     const index = physicsObjects.indexOf(obj);
     if (index > -1) physicsObjects.splice(index, 1);
 
-    // Change to dark gray and mark as no longer hot
-    obj.mesh.material.color.setHex(0x3a3a3a); // Dark gray
-    obj.mesh.material.emissive.setHex(0x000000); // No glow
-    obj.mesh.material.emissiveIntensity = 0;
-    obj.mesh.material.needsUpdate = true;
-    obj.isHot = false; // No longer dangerous to villagers
+    // Re-add as static collidable body
+    const staticBody = new CANNON.Body({
+        mass: 0,
+        material: lavaMat, // Use lava material so other lava can collide with it
+    });
+    staticBody.addShape(obj.body.shapes[0]);
+    staticBody.position.copy(obj.body.position);
+    world.addBody(staticBody);
 
-    // Keep in scene as solidified terrain (frozen at current position)
-    solidifiedLava.push(obj.mesh);
+    // Keep in scene as solidified terrain
+    solidifiedLava.push({ mesh: obj.mesh, body: staticBody });
 }
 
 // Remove lava that falls too far or goes out of bounds
@@ -923,16 +1080,8 @@ const spawnInterval = 10; // seconds
 const clock = new THREE.Clock();
 let lastTime = 0;
 
-let frameCount = 0;
 function animate() {
     requestAnimationFrame(animate);
-
-    frameCount++;
-    if (frameCount === 1) {
-        console.log('First frame rendering!');
-        console.log('Camera position:', camera.position);
-        console.log('Scene children:', scene.children.length);
-    }
 
     const currentTime = clock.getElapsedTime();
     const deltaTime = currentTime - lastTime;
@@ -956,9 +1105,40 @@ function animate() {
         // Track age
         obj.age += deltaTime;
 
-        // Check if lava should solidify (very low velocity AND has collided with something, or very old)
+        // Emit smoke trail for hot lava (but not too frequently)
+        if (obj.isHot && Math.random() < 0.15) { // 15% chance each frame
+            createLavaSmoke(obj.body.position);
+        }
+
+        // Check for collision with trees
+        let hitCollidable = false;
+        for (let j = 0; j < trees.length; j++) {
+            const tree = trees[j];
+            const distance = obj.body.position.distanceTo(tree.body.position);
+            if (distance < 2.0) { // Within collision range
+                hitCollidable = true;
+                break;
+            }
+        }
+
+        // Check for collision with solidified lava
+        if (!hitCollidable) {
+            for (let j = 0; j < solidifiedLava.length; j++) {
+                const solidLava = solidifiedLava[j];
+                const dx = obj.body.position.x - solidLava.body.position.x;
+                const dy = obj.body.position.y - solidLava.body.position.y;
+                const dz = obj.body.position.z - solidLava.body.position.z;
+                const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                if (distance < 1.5) { // Within collision range
+                    hitCollidable = true;
+                    break;
+                }
+            }
+        }
+
+        // Check if lava should solidify
         const velocity = obj.body.velocity.length();
-        const shouldSolidify = (velocity < 0.3 && obj.hasCollided && obj.age > 0.3) || obj.age > 10;
+        const shouldSolidify = (velocity < 0.3 && obj.hasCollided && obj.age > 0.3) || obj.age > 10 || hitCollidable;
 
         // Check if lava has fallen too far or is out of bounds
         const yPos = obj.body.position.y;
@@ -976,7 +1156,7 @@ function animate() {
         } else if (isOutOfBounds) {
             cleanupOutOfBoundsLava(obj, false); // Out of bounds - no steam
         } else if (shouldSolidify) {
-            solidifyLava(obj);
+            solidifyLava(obj, hitCollidable);
         }
     }
 
@@ -1059,13 +1239,11 @@ function animate() {
                 // Reached waypoint 1, head to waypoint 2
                 villager.currentWaypoint = 1;
                 villager.target = villager.villageId === 1 ? waypoint2v1.clone() : waypoint2v2.clone();
-                console.log(`Villager from village ${villager.villageId} reached waypoint 1, heading to waypoint 2`);
             } else if (villager.currentWaypoint === 1) {
                 // Reached waypoint 2, head to caldera edge
                 villager.currentWaypoint = 2;
                 const calderaRadius = volcanoRadius * 0.15;
                 villager.target = new THREE.Vector3(0, volcanoHeight, 0);
-                console.log(`Villager from village ${villager.villageId} reached waypoint 2, heading to caldera`);
             }
         }
 
@@ -1082,7 +1260,6 @@ function animate() {
                 villager.performingRitual = true;
                 villager.ritualTime = 0;
                 villager.ritualStartY = villager.body.position.y;
-                console.log(`${villager.isPrincess ? 'Princess' : 'Villager'} from village ${villager.villageId} beginning ritual at caldera!`);
             }
         }
 
@@ -1108,8 +1285,6 @@ function animate() {
             // Check if ritual is complete
             if (villager.ritualTime >= villager.ritualDuration) {
                 if (villager.isPrincess) {
-                    console.log(`Princess from village ${villager.villageId} completed ritual - EXPLODING!`);
-
                     // Create massive red explosion
                     createRedExplosion(villager.body.position);
 
@@ -1145,14 +1320,6 @@ function animate() {
                 const targetHeight = surfaceHeight + 5.0; // Surface + 5 units above to ensure visibility
                 villager.body.position.y = targetHeight;
                 villager.body.velocity.y = 0; // Cancel any vertical velocity
-
-                // Debug logging for first villager
-                if (i === 0 && frameCount % 120 === 0) {
-                    console.log('Villager pos:', villager.body.position.x.toFixed(1), villager.body.position.y.toFixed(1), villager.body.position.z.toFixed(1));
-                    console.log('Target:', villager.target.x.toFixed(1), villager.target.y.toFixed(1), villager.target.z.toFixed(1));
-                    console.log('Direction:', directionXZ.x.toFixed(2), directionXZ.y.toFixed(2));
-                    console.log('Surface height:', surfaceHeight.toFixed(1), 'Distance to target XZ:', distanceToTargetXZ.toFixed(1));
-                }
             } else if (!shouldMove) {
                 // Escort without princess nearby - slow down
                 villager.body.velocity.x *= 0.5;
@@ -1170,11 +1337,6 @@ function animate() {
         const villageHeight = village.position.y;
         const winHeight = volcanoHeight * 0.9;
         const elevationRange = winHeight - villageHeight;
-
-        // Debug log for first villager
-        if (i === 0 && frameCount % 60 === 0) {
-            console.log('Villager Y:', villager.body.position.y, 'Village Y:', villageHeight, 'Win Y:', winHeight, 'Range:', elevationRange);
-        }
 
         const villagerProgress = (villager.body.position.y - villageHeight) / elevationRange;
         const clampedProgress = Math.max(0, Math.min(1, villagerProgress));
@@ -1198,8 +1360,6 @@ function animate() {
 
             if (distance < 2.0) { // Increased range for easier hits
                 // Destroy villager
-                const villagerType = villager.isPrincess ? 'Princess' : 'Villager';
-                console.log(`${villagerType} destroyed by lava!`);
                 gameState.villagerKillCount++;
 
                 // Create black smoke at villager position
@@ -1210,6 +1370,9 @@ function animate() {
 
                 // Create ember at villager position
                 createEmber(villager.body.position);
+
+                // Solidify the lava that hit the villager
+                solidifyLava(lava, true); // hitCollidable = true
 
                 villagers.splice(i, 1);
                 break;
@@ -1222,14 +1385,12 @@ function animate() {
     if (!gameState.gameOver && gameState.started) {
         // Spawn from village 1
         if (currentTime - lastSpawnTimeV1 > spawnInterval) {
-            console.log(`Spawning new group from Village 1 at time ${currentTime.toFixed(1)}s`);
             spawnVillagerGroup(1);
             lastSpawnTimeV1 = currentTime;
         }
 
         // Spawn from village 2
         if (currentTime - lastSpawnTimeV2 > spawnInterval) {
-            console.log(`Spawning new group from Village 2 at time ${currentTime.toFixed(1)}s`);
             spawnVillagerGroup(2);
             lastSpawnTimeV2 = currentTime;
         }
@@ -1278,18 +1439,5 @@ function animate() {
     updateUI();
     renderer.render(scene, camera);
 }
-
-console.log('Starting animation loop...');
-console.log('Camera initial position:', camera.position);
-console.log('Scene has', scene.children.length, 'children');
-console.log('Physics world has', world.bodies.length, 'bodies');
-
-// Test collision by logging when bodies collide
-world.addEventListener('beginContact', (event) => {
-    console.log('Collision detected!', event);
-});
-
-// Don't spawn villagers until game starts (spacebar press)
-console.log('Press SPACE to start the game');
 
 animate();
