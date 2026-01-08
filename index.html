@@ -2,13 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Volcano God</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
             font-family: Arial, sans-serif;
+            touch-action: none;
+            overscroll-behavior: none;
         }
         canvas {
             display: block;
@@ -34,6 +36,43 @@
             border-radius: 5px;
             font-size: 12px;
             text-align: center;
+        }
+        .mobile-button {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.3);
+            border: 3px solid rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            width: 80px;
+            height: 80px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            text-align: center;
+            touch-action: none;
+            user-select: none;
+            transition: background 0.1s, transform 0.1s;
+        }
+        .mobile-button:active {
+            background: rgba(255, 255, 255, 0.5);
+            transform: scale(0.95);
+        }
+        #fire-button {
+            bottom: 20px;
+            left: 20px;
+        }
+        #switch-button {
+            bottom: 20px;
+            left: 120px;
+        }
+        #pause-button {
+            top: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            font-size: 12px;
         }
     </style>
 </head>
@@ -110,6 +149,11 @@
             margin-top: 20px;
         ">Back</button>
     </div>
+
+    <!-- Mobile touch controls -->
+    <div id="fire-button" class="mobile-button">FIRE</div>
+    <div id="switch-button" class="mobile-button">SWITCH</div>
+    <div id="pause-button" class="mobile-button">PAUSE</div>
 
     <script type="module" src="/main.js"></script>
 </body>

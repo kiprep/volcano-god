@@ -4,6 +4,9 @@ import * as CANNON from 'cannon-es';
 // Debug mode
 const debugMode = false;
 
+// Detect if device is mobile/touch-enabled
+const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
 // Game state
 const gameState = {
     started: false, // Game hasn't started yet
@@ -1297,6 +1300,15 @@ function updateUI() {
     document.getElementById('kill-count').textContent = gameState.villagerKillCount;
     document.getElementById('highest-elevation').textContent =
         Math.floor(gameState.highestVillagerElevation * 100);
+
+    // Update switch button on mobile
+    if (isMobile) {
+        const switchButton = document.getElementById('switch-button');
+        if (switchButton) {
+            const typeShort = gameState.lavaType.charAt(0).toUpperCase() + gameState.lavaType.slice(1, 4).toUpperCase();
+            switchButton.textContent = typeShort;
+        }
+    }
 }
 
 // Game over function
@@ -1367,6 +1379,10 @@ document.addEventListener('keydown', (e) => {
         const pauseScreen = document.getElementById('pause-screen');
         if (gameState.paused) {
             pauseScreen.style.display = 'block';
+            // Release pointer lock when pausing
+            if (document.pointerLockElement) {
+                document.exitPointerLock();
+            }
         } else {
             pauseScreen.style.display = 'none';
 
@@ -1437,14 +1453,16 @@ document.addEventListener('mouseup', (e) => {
     if (e.button === 0) input.fire = false;
 });
 
-// Pointer lock for mouse look
-renderer.domElement.addEventListener('click', () => {
-    renderer.domElement.requestPointerLock();
-});
+// Pointer lock for mouse look (desktop only)
+if (!isMobile) {
+    renderer.domElement.addEventListener('click', () => {
+        renderer.domElement.requestPointerLock();
+    });
 
-document.addEventListener('pointerlockchange', () => {
-    gameState.isPointerLocked = document.pointerLockElement === renderer.domElement;
-});
+    document.addEventListener('pointerlockchange', () => {
+        gameState.isPointerLocked = document.pointerLockElement === renderer.domElement;
+    });
+}
 
 // Mouse look
 let mouseX = 0;
@@ -1452,7 +1470,8 @@ let mouseY = 0;
 const lookSensitivity = 0.002;
 
 document.addEventListener('mousemove', (e) => {
-    if (gameState.isPointerLocked) {
+    // On desktop, require pointer lock. On mobile, this won't be used anyway.
+    if (isMobile || gameState.isPointerLocked) {
         mouseX += e.movementX * lookSensitivity;
         const yMultiplier = gameState.invertMouseY ? -1 : 1;
         mouseY += e.movementY * lookSensitivity * yMultiplier;
@@ -1460,6 +1479,52 @@ document.addEventListener('mousemove', (e) => {
         // Clamp vertical look
         mouseY = Math.max(-Math.PI / 3, Math.min(Math.PI / 6, mouseY));
     }
+});
+
+// Touch controls for camera aiming
+let lastTouchX = 0;
+let lastTouchY = 0;
+let isTouching = false;
+
+document.addEventListener('touchstart', (e) => {
+    // Only handle camera touch if not touching a button
+    const touch = e.touches[0];
+    const target = e.target;
+
+    // Ignore touches on UI buttons
+    if (target.classList.contains('mobile-button')) {
+        return;
+    }
+
+    isTouching = true;
+    lastTouchX = touch.clientX;
+    lastTouchY = touch.clientY;
+    e.preventDefault();
+}, { passive: false });
+
+document.addEventListener('touchmove', (e) => {
+    if (!isTouching) return;
+
+    const touch = e.touches[0];
+    const deltaX = touch.clientX - lastTouchX;
+    const deltaY = touch.clientY - lastTouchY;
+
+    // Apply touch movement to camera (similar to mouse)
+    const touchSensitivity = 0.005;
+    mouseX += deltaX * touchSensitivity;
+    const yMultiplier = gameState.invertMouseY ? -1 : 1;
+    mouseY += deltaY * touchSensitivity * yMultiplier;
+
+    // Clamp vertical look
+    mouseY = Math.max(-Math.PI / 3, Math.min(Math.PI / 6, mouseY));
+
+    lastTouchX = touch.clientX;
+    lastTouchY = touch.clientY;
+    e.preventDefault();
+}, { passive: false });
+
+document.addEventListener('touchend', (e) => {
+    isTouching = false;
 });
 
 // Handle window resize
@@ -1503,6 +1568,91 @@ document.getElementById('settings-back-btn').addEventListener('click', () => {
 document.getElementById('invert-y-toggle').addEventListener('change', (e) => {
     gameState.invertMouseY = e.target.checked;
 });
+
+// Show/hide UI elements based on device type
+if (isMobile) {
+    // Show mobile controls
+    document.getElementById('fire-button').style.display = 'flex';
+    document.getElementById('switch-button').style.display = 'flex';
+    document.getElementById('pause-button').style.display = 'flex';
+
+    // Hide desktop controls
+    document.getElementById('controls').style.display = 'none';
+
+    // Hide free flying button in pause menu
+    document.getElementById('free-flying-btn').style.display = 'none';
+
+    // Mobile button event handlers
+    const fireButton = document.getElementById('fire-button');
+    const switchButton = document.getElementById('switch-button');
+    const pauseButton = document.getElementById('pause-button');
+
+    // Fire button - hold to fire
+    fireButton.addEventListener('touchstart', (e) => {
+        input.fire = true;
+        e.preventDefault();
+    });
+    fireButton.addEventListener('touchend', (e) => {
+        input.fire = false;
+        e.preventDefault();
+    });
+
+    // Switch button - tap to cycle lava type
+    switchButton.addEventListener('touchstart', (e) => {
+        changeLavaType(1);
+        e.preventDefault();
+    });
+
+    // Pause button - tap to toggle pause
+    pauseButton.addEventListener('touchstart', (e) => {
+        if (gameState.started && !gameState.gameOver) {
+            gameState.paused = !gameState.paused;
+            const pauseScreen = document.getElementById('pause-screen');
+            if (gameState.paused) {
+                pauseScreen.style.display = 'block';
+                // Release pointer lock when pausing
+                if (document.pointerLockElement) {
+                    document.exitPointerLock();
+                }
+            } else {
+                pauseScreen.style.display = 'none';
+            }
+        }
+        e.preventDefault();
+    });
+
+    // Start game with touch on start screen
+    document.getElementById('start-screen').addEventListener('touchstart', (e) => {
+        if (!gameState.started && !gameState.gameOver) {
+            gameState.started = true;
+            document.getElementById('start-screen').style.display = 'none';
+            // Start spawning villagers from both villages
+            const currentTime = clock.getElapsedTime();
+            lastSpawnTimeV1 = currentTime;
+            lastSpawnTimeV2 = currentTime;
+            spawnVillagerGroup(1);
+            spawnVillagerGroup(2);
+        }
+        e.preventDefault();
+    });
+
+    // Update start screen text for mobile
+    const startScreen = document.getElementById('start-screen');
+    const startText = startScreen.querySelector('p:last-child');
+    startText.textContent = 'Tap to Start';
+    startText.style.fontSize = '32px';
+
+    // Update pause screen text for mobile
+    const pauseScreen = document.getElementById('pause-screen');
+    const pauseText = pauseScreen.querySelector('p');
+    pauseText.textContent = 'Tap PAUSE to Resume';
+    pauseText.style.fontSize = '24px';
+} else {
+    // Hide mobile controls on desktop
+    document.getElementById('fire-button').style.display = 'none';
+    document.getElementById('switch-button').style.display = 'none';
+    document.getElementById('pause-button').style.display = 'none';
+}
 
 // Fire rate limiting
 let lastFireTime = 0;
