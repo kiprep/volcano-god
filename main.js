@@ -1301,6 +1301,35 @@ function updateUI() {
     document.getElementById('highest-elevation').textContent =
         Math.floor(gameState.highestVillagerElevation * 100);
 
+    // Update lava resource bar
+    const lavaPercentage = (gameState.lavaAmount / gameState.lavaMax) * 100;
+    const lavaBarFill = document.getElementById('lava-bar-fill');
+    if (lavaBarFill) {
+        lavaBarFill.style.width = lavaPercentage + '%';
+    }
+
+    // Update cost indicator
+    const cost = gameState.lavaType === 'bomb' ? gameState.lavaMax * 0.5 :
+                 gameState.lavaType === 'boulder' ? 10 :
+                 gameState.lavaType === 'spray' ? 5 : 20;
+    const afterFireAmount = Math.max(0, gameState.lavaAmount - cost);
+    const afterFirePercentage = (afterFireAmount / gameState.lavaMax) * 100;
+    const costIndicator = document.getElementById('lava-bar-cost-indicator');
+    if (costIndicator) {
+        costIndicator.style.left = afterFirePercentage + '%';
+    }
+
+    // Update weapon icon
+    const weaponIcon = document.getElementById('weapon-icon');
+    if (weaponIcon) {
+        const iconMap = {
+            'boulder': '🪨',
+            'bomb': '💣',
+            'spray': '💦'
+        };
+        weaponIcon.textContent = iconMap[gameState.lavaType] || '🪨';
+    }
+
     // Update switch button on mobile
     if (isMobile) {
         const switchButton = document.getElementById('switch-button');

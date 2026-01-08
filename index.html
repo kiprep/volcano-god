@@ -79,6 +79,82 @@
             font-family: monospace;
         }
 
+        /* Lava resource bar */
+        #lava-bar-container {
+            position: absolute;
+            top: 20px;
+            left: 90px;
+            width: 250px;
+            height: 30px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            border-radius: 15px;
+            overflow: hidden;
+        }
+        #weapon-icon {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #ff6347, #ff4500);
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+        }
+        #lava-bar-fill {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(90deg, #ffff00, #ff0000);
+            background-size: 200% 100%;
+            animation: lavaGradient 4s ease-in-out infinite;
+            transition: width 0.3s ease-out;
+        }
+        #lava-bar-cost-indicator {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            width: 2px;
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 0 4px rgba(255, 255, 255, 0.8);
+            transition: left 0.3s ease-out;
+            z-index: 10;
+        }
+        @keyframes lavaGradient {
+            0% {
+                background-position: 0% 0%;
+            }
+            50% {
+                background-position: 100% 0%;
+            }
+            100% {
+                background-position: 0% 0%;
+            }
+        }
+
+        /* Desktop positioning */
+        @media screen and (min-width: 768px) {
+            #lava-bar-container {
+                width: 300px;
+                height: 35px;
+            }
+            #weapon-icon {
+                width: 60px;
+                height: 60px;
+                font-size: 32px;
+            }
+            #lava-bar-container {
+                left: 100px;
+            }
+        }
+
         /* Landscape mode adjustments for mobile */
         @media screen and (orientation: landscape) {
             .mobile-button {
@@ -108,13 +184,33 @@
                 padding: 10px;
                 font-size: 12px;
             }
+            #lava-bar-container {
+                top: 15px;
+                left: 85px;
+                width: 200px;
+                height: 25px;
+            }
+            #weapon-icon {
+                top: 15px;
+                left: 15px;
+                width: 45px;
+                height: 45px;
+                font-size: 24px;
+            }
         }
     </style>
 </head>
 <body>
-    <div id="ui">
+    <div id="ui" style="display: none;">
         <div>Lava Type: <span id="lava-type">Boulder</span></div>
         <div>Lava Amount: <span id="lava-amount">100</span>%</div>
+    </div>
+
+    <!-- Lava resource bar -->
+    <div id="weapon-icon">🪨</div>
+    <div id="lava-bar-container">
+        <div id="lava-bar-fill"></div>
+        <div id="lava-bar-cost-indicator"></div>
     </div>
 
     <div id="villager-ui" style="position: absolute; top: 20px; right: 20px; color: white; background: rgba(0, 0, 0, 0.5); padding: 15px; border-radius: 5px; font-size: 14px; display: none;">
