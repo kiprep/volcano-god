@@ -19,6 +19,7 @@ const gameState = {
     villagerKillCount: 0,
     gameOver: false,
     highestVillagerElevation: 0, // Percentage from village to win condition
+    invertMouseY: false, // Invert vertical mouse controls
 };
 
 // Input state
@@ -730,6 +731,22 @@ function createVillager(position, isPrincess = false, villageId = 1) {
     mesh.castShadow = true;
     scene.add(mesh);
 
+    // Create head (pink sphere at tip of cone)
+    const headRadius = isPrincess
+        ? villagerRadius * princessScale * 0.36  // Princess: 40% smaller (0.6 * 0.6)
+        : villagerRadius * princessScale * 0.72; // Villager: 20% larger (0.6 * 1.2)
+    const headGeometry = new THREE.SphereGeometry(headRadius, 16, 16);
+    const headMaterial = new THREE.MeshStandardMaterial({
+        color: 0xffc0cb, // Pink
+        roughness: 0.7,
+    });
+    const headMesh = new THREE.Mesh(headGeometry, headMaterial);
+    // Position head center at tip of cone (same as body position)
+    headMesh.position.copy(position);
+    headMesh.position.y += villagerHeight / 2; // Same as body position
+    headMesh.castShadow = true;
+    scene.add(headMesh);
+
     // Physics - use cylinder for simpler collision with no bounce
     const shape = new CANNON.Cylinder(villagerRadius, villagerRadius, villagerHeight, 8);
     const body = new CANNON.Body({
@@ -753,6 +770,7 @@ function createVillager(position, isPrincess = false, villageId = 1) {
 
     const villager = {
         mesh,
+        headMesh,
         body,
         height: villagerHeight * princessScale,
         currentWaypoint: 0, // 0 = waypoint1, 1 = waypoint2, 2 = summit
@@ -991,6 +1009,7 @@ function explodeBomb(obj) {
 
             // Remove villager
             scene.remove(villager.mesh);
+            scene.remove(villager.headMesh);
             world.removeBody(villager.body);
 
             // Create ember at villager position
@@ -1435,7 +1454,8 @@ const lookSensitivity = 0.002;
 document.addEventListener('mousemove', (e) => {
     if (gameState.isPointerLocked) {
         mouseX += e.movementX * lookSensitivity;
-        mouseY += e.movementY * lookSensitivity;
+        const yMultiplier = gameState.invertMouseY ? -1 : 1;
+        mouseY += e.movementY * lookSensitivity * yMultiplier;
 
         // Clamp vertical look
         mouseY = Math.max(-Math.PI / 3, Math.min(Math.PI / 6, mouseY));
@@ -1463,6 +1483,25 @@ document.getElementById('free-flying-btn').addEventListener('click', () => {
         mouseX = 0;
         mouseY = 0;
     }
+});
+
+// Settings button
+document.getElementById('settings-btn').addEventListener('click', () => {
+    document.getElementById('pause-screen').style.display = 'none';
+    document.getElementById('settings-screen').style.display = 'block';
+    // Sync checkbox state with current setting
+    document.getElementById('invert-y-toggle').checked = gameState.invertMouseY;
+});
+
+// Settings back button
+document.getElementById('settings-back-btn').addEventListener('click', () => {
+    document.getElementById('settings-screen').style.display = 'none';
+    document.getElementById('pause-screen').style.display = 'block';
+});
+
+// Invert Y-axis toggle
+document.getElementById('invert-y-toggle').addEventListener('change', (e) => {
+    gameState.invertMouseY = e.target.checked;
 });
 
 // Fire rate limiting
@@ -1682,6 +1721,9 @@ function animate() {
         villager.mesh.position.copy(villager.body.position);
         villager.mesh.position.y -= villager.height / 2; // Adjust for cone base
 
+        // Sync head position (center of sphere at tip of cone)
+        villager.headMesh.position.copy(villager.body.position);
+
         // Only sync quaternion if not performing ritual (ritual sets rotation manually)
         if (!villager.performingRitual) {
             villager.mesh.quaternion.copy(villager.body.quaternion);
@@ -1766,6 +1808,7 @@ function animate() {
 
                     // Remove the princess
                     scene.remove(villager.mesh);
+                    scene.remove(villager.headMesh);
                     world.removeBody(villager.body);
                     villagers.splice(i, 1);
 
@@ -1873,6 +1916,7 @@ function animate() {
                 createBlackSmoke(villager.body.position);
 
                 scene.remove(villager.mesh);
+                scene.remove(villager.headMesh);
                 world.removeBody(villager.body);
 
                 // Create ember at villager position
