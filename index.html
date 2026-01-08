@@ -72,7 +72,43 @@
             right: 20px;
             width: 60px;
             height: 60px;
-            font-size: 12px;
+            font-size: 32px;
+            line-height: 60px;
+            letter-spacing: 4px;
+            font-weight: bold;
+            font-family: monospace;
+        }
+
+        /* Landscape mode adjustments for mobile */
+        @media screen and (orientation: landscape) and (max-height: 500px) {
+            #fire-button {
+                bottom: 15px;
+                left: 15px;
+                width: 70px;
+                height: 70px;
+                font-size: 12px;
+            }
+            #switch-button {
+                bottom: 15px;
+                left: 105px;
+                width: 70px;
+                height: 70px;
+                font-size: 12px;
+            }
+            #pause-button {
+                top: 15px;
+                right: 15px;
+                width: 50px;
+                height: 50px;
+                font-size: 28px;
+                line-height: 50px;
+            }
+            #ui {
+                top: 15px;
+                left: 15px;
+                padding: 10px;
+                font-size: 12px;
+            }
         }
     </style>
 </head>
@@ -82,7 +118,7 @@
         <div>Lava Amount: <span id="lava-amount">100</span>%</div>
     </div>
 
-    <div id="villager-ui" style="position: absolute; top: 20px; right: 20px; color: white; background: rgba(0, 0, 0, 0.5); padding: 15px; border-radius: 5px; font-size: 14px;">
+    <div id="villager-ui" style="position: absolute; top: 20px; right: 20px; color: white; background: rgba(0, 0, 0, 0.5); padding: 15px; border-radius: 5px; font-size: 14px; display: none;">
         <div>Villagers Alive: <span id="villager-count">0</span></div>
         <div>Kills: <span id="kill-count">0</span></div>
         <div>Highest Elevation: <span id="highest-elevation">0</span>%</div>
@@ -153,7 +189,7 @@
     <!-- Mobile touch controls -->
     <div id="fire-button" class="mobile-button">FIRE</div>
     <div id="switch-button" class="mobile-button">SWITCH</div>
-    <div id="pause-button" class="mobile-button">PAUSE</div>
+    <div id="pause-button" class="mobile-button">||</div>
 
     <script type="module" src="/main.js"></script>
 </body>

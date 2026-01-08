@@ -1534,6 +1534,27 @@ window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
+// Handle orientation change on mobile
+if (isMobile) {
+    window.addEventListener('orientationchange', () => {
+        // Wait for orientation change to complete
+        setTimeout(() => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }, 100);
+    });
+
+    // Also listen to screen orientation API if available
+    if (screen.orientation) {
+        screen.orientation.addEventListener('change', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    }
+}
+
 // Free-flying mode button
 document.getElementById('free-flying-btn').addEventListener('click', () => {
     gameState.freeFlying = !gameState.freeFlying;
@@ -1645,7 +1666,7 @@ if (isMobile) {
     // Update pause screen text for mobile
     const pauseScreen = document.getElementById('pause-screen');
     const pauseText = pauseScreen.querySelector('p');
-    pauseText.textContent = 'Tap PAUSE to Resume';
+    pauseText.textContent = 'Tap || to Resume';
     pauseText.style.fontSize = '24px';
 } else {
     // Hide mobile controls on desktop
