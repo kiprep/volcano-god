@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Volcano God</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 12px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <div>Lava Type: <span id="lava-type">Boulder</span></div>
+        <div>Lava Amount: <span id="lava-amount">100</span>%</div>
+    </div>
+
+    <div id="villager-ui" style="position: absolute; top: 20px; right: 20px; color: white; background: rgba(0, 0, 0, 0.5); padding: 15px; border-radius: 5px; font-size: 14px;">
+        <div>Villagers Alive: <span id="villager-count">0</span></div>
+        <div>Kills: <span id="kill-count">0</span></div>
+        <div>Highest Elevation: <span id="highest-elevation">0</span>%</div>
+    </div>
+
+    <div id="controls">
+        <div><strong>Controls:</strong></div>
+        <div>Mouse: Look around</div>
+        <div>A/D or Left/Right Arrow: Rotate left/right</div>
+        <div>Q/E: Change lava type</div>
+        <div>Left Click or Space: Fire lava</div>
+        <div>Enter: Pause/Resume</div>
+    </div>
+
+    <div id="start-screen" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, 0.9); color: white; padding: 60px; border-radius: 10px; text-align: center; font-size: 24px; z-index: 1000;">
+        <h1 style="color: #ff6600; margin-bottom: 30px; font-size: 48px;">VOLCANO GOD</h1>
+        <p style="margin-bottom: 20px;">Defend your volcano from climbing villagers!</p>
+        <p style="margin-bottom: 40px; color: #ff1493; font-size: 20px;">Stop the Princess from reaching the summit!</p>
+        <p style="font-size: 32px; color: #ffaa00;">Press SPACE to Start</p>
+    </div>
+
+    <div id="pause-screen" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, 0.9); color: white; padding: 60px; border-radius: 10px; text-align: center; font-size: 24px; z-index: 1000;">
+        <h1 style="color: #ffaa00; margin-bottom: 30px; font-size: 48px;">PAUSED</h1>
+        <p style="font-size: 32px; color: #ffffff;">Press ENTER to Resume</p>
+    </div>
+
+    <script type="module" src="/main.js"></script>
+</body>
+</html>
