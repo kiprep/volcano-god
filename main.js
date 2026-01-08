@@ -19,10 +19,68 @@ const gameState = {
     isPointerLocked: false,
     rotation: 0, // Player rotation around volcano
     rotationSpeed: 1.5, // radians per second
+    cutiePatootieMode: false, // Sprite mode disabled by default
     villagerKillCount: 0,
     gameOver: false,
     highestVillagerElevation: 0, // Percentage from village to win condition
     invertMouseY: false, // Invert vertical mouse controls (set based on device type later)
+};
+
+// Load saved Cutie Patootie preference
+const savedCutieMode = localStorage.getItem('volcano-god-cutie-mode');
+if (savedCutieMode !== null) {
+    gameState.cutiePatootieMode = savedCutieMode === 'true';
+}
+
+// Sync checkbox with loaded value
+window.addEventListener('DOMContentLoaded', () => {
+    const startToggle = document.getElementById('start-cutie-patootie-toggle');
+    if (startToggle) {
+        startToggle.checked = gameState.cutiePatootieMode;
+    }
+});
+
+// Load sprite textures for Cutie Patootie Mode
+const textureLoader = new THREE.TextureLoader();
+const spriteTextures = {
+    princess: [
+        textureLoader.load('./assets/sprites/princess-1.png',
+            undefined,
+            undefined,
+            (err) => console.error('Error loading princess-1.png:', err)),
+        textureLoader.load('./assets/sprites/princess-2.png',
+            undefined,
+            undefined,
+            (err) => console.error('Error loading princess-2.png:', err))
+    ],
+    normal: [
+        textureLoader.load('./assets/sprites/normal-1.png',
+            undefined,
+            undefined,
+            (err) => console.error('Error loading normal-1.png:', err)),
+        textureLoader.load('./assets/sprites/normal-2.png',
+            undefined,
+            undefined,
+            (err) => console.error('Error loading normal-2.png:', err)),
+        textureLoader.load('./assets/sprites/normal-3.png',
+            undefined,
+            undefined,
+            (err) => console.error('Error loading normal-3.png:', err))
+    ],
+    brute: [
+        textureLoader.load('./assets/sprites/brute-1.png',
+            undefined,
+            undefined,
+            (err) => console.error('Error loading brute-1.png:', err)),
+        textureLoader.load('./assets/sprites/brute-2.png',
+            undefined,
+            undefined,
+            (err) => console.error('Error loading brute-2.png:', err)),
+        textureLoader.load('./assets/sprites/brute-3.png',
+            undefined,
+            undefined,
+            (err) => console.error('Error loading brute-3.png:', err))
+    ]
 };
 
 // Input state
@@ -715,40 +773,117 @@ function createTree(position) {
 }
 
 // Create a villager (cone shape)
-function createVillager(position, isPrincess = false, villageId = 1) {
+function createVillager(position, isPrincess = false, villageId = 1, isBrute = false) {
     const villagerHeight = 1.5;
     const villagerRadius = 0.4;
 
-    // Visual cone with color based on type - princess is MUCH brighter and BIGGER
-    const princessScale = isPrincess ? 3.0 : 1.0; // Princess is 3x bigger!
-    const geometry = new THREE.ConeGeometry(villagerRadius * princessScale, villagerHeight * princessScale, 8);
-    const material = new THREE.MeshStandardMaterial({
-        color: isPrincess ? 0xff0000 : 0xadd8e6, // PURE RED for princess, light blue for others
-        flatShading: true,
-        emissive: isPrincess ? 0xff0000 : 0x4682b4,
-        emissiveIntensity: isPrincess ? 3.0 : 0.1, // Princess glows VERY bright
-    });
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.copy(position);
-    mesh.position.y += villagerHeight * princessScale / 2; // Adjust for cone base
-    mesh.castShadow = true;
-    scene.add(mesh);
+    // Determine scale and type
+    const scale = (isPrincess || isBrute) ? 3.0 : 1.0; // Princess and Brute are 3x bigger!
+    const villagerType = isPrincess ? 'princess' : (isBrute ? 'brute' : 'normal');
 
-    // Create head (pink sphere at tip of cone)
-    const headRadius = isPrincess
-        ? villagerRadius * princessScale * 0.36  // Princess: 40% smaller (0.6 * 0.6)
-        : villagerRadius * princessScale * 0.72; // Villager: 20% larger (0.6 * 1.2)
-    const headGeometry = new THREE.SphereGeometry(headRadius, 16, 16);
-    const headMaterial = new THREE.MeshStandardMaterial({
-        color: 0xffc0cb, // Pink
-        roughness: 0.7,
-    });
-    const headMesh = new THREE.Mesh(headGeometry, headMaterial);
-    // Position head center at tip of cone (same as body position)
-    headMesh.position.copy(position);
-    headMesh.position.y += villagerHeight / 2; // Same as body position
-    headMesh.castShadow = true;
-    scene.add(headMesh);
+    // Set health based on type
+    const maxHealth = villagerType === 'brute' ? 4 : 2; // Brute: 4 HP, others: 2 HP
+
+    // Calculate head radius for health bar positioning
+    const headRadius = (isPrincess || isBrute)
+        ? villagerRadius * scale * 0.36
+        : villagerRadius * scale * 0.72;
+
+    let mesh, headMesh;
+
+    if (gameState.cutiePatootieMode) {
+        // CUTIE PATOOTIE MODE: Use sprite
+        // Select texture based on type
+        let texture;
+        if (isPrincess) {
+            texture = spriteTextures.princess[villageId - 1]; // Princess 1 or 2 based on village
+        } else if (isBrute) {
+            const randomIndex = Math.floor(Math.random() * spriteTextures.brute.length);
+            texture = spriteTextures.brute[randomIndex];
+        } else {
+            const randomIndex = Math.floor(Math.random() * spriteTextures.normal.length);
+            texture = spriteTextures.normal[randomIndex];
+        }
+
+        // Create sprite material with transparency
+        const spriteMaterial = new THREE.SpriteMaterial({
+            map: texture,
+            transparent: true,
+            alphaTest: 0.05, // Discard pixels below 5% opacity (was 10%)
+            sizeAttenuation: true, // Sprite scales with distance
+        });
+        mesh = new THREE.Sprite(spriteMaterial);
+
+        // Adjust sprite size: normal villagers +25%, brutes/princesses -40%
+        const sizeAdjust = (isPrincess || isBrute) ? 0.6 : 1.25;
+        const spriteWidth = villagerHeight * scale * 0.8 * sizeAdjust;
+        const spriteHeight = villagerHeight * scale * sizeAdjust;
+        mesh.scale.set(spriteWidth, spriteHeight, 1);
+
+        mesh.position.copy(position);
+        // Position sprites lower for large villagers (princess/brute) so they glide over surface
+        if (isPrincess || isBrute) {
+            mesh.position.y += spriteHeight * 0.3; // Lower positioning for large sprites
+        } else {
+            mesh.position.y += villagerHeight * scale / 2; // Center for normal villagers
+        }
+        scene.add(mesh);
+
+        // No separate head mesh for sprites
+        headMesh = null;
+    } else {
+        // NORMAL MODE: Use 3D cone and sphere
+        const color = isPrincess ? 0xff0000 : (isBrute ? 0x8b0000 : 0xadd8e6);
+        const emissive = isPrincess ? 0xff0000 : (isBrute ? 0xff4500 : 0x4682b4);
+        const emissiveIntensity = isPrincess ? 3.0 : (isBrute ? 1.5 : 0.1);
+
+        const geometry = new THREE.ConeGeometry(villagerRadius * scale, villagerHeight * scale, 8);
+        const material = new THREE.MeshStandardMaterial({
+            color: color,
+            flatShading: true,
+            emissive: emissive,
+            emissiveIntensity: emissiveIntensity,
+        });
+        mesh = new THREE.Mesh(geometry, material);
+        mesh.position.copy(position);
+        mesh.position.y += villagerHeight * scale / 2;
+        mesh.castShadow = true;
+        scene.add(mesh);
+
+        // Create head (pink sphere at tip of cone)
+        const headGeometry = new THREE.SphereGeometry(headRadius, 16, 16);
+        const headMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffc0cb,
+            roughness: 0.7,
+        });
+        headMesh = new THREE.Mesh(headGeometry, headMaterial);
+        headMesh.position.copy(position);
+        headMesh.position.y += villagerHeight / 2;
+        headMesh.castShadow = true;
+        scene.add(headMesh);
+    }
+
+    // Create health bar above villager - height (thickness) based on max health
+    const healthBarWidth = scale * 1.2; // Consistent width
+    const healthBarBaseHeight = 0.1; // Base height per HP
+    const healthBarHeight = healthBarBaseHeight * (maxHealth / 2); // Height scales with HP (normalized to 2 HP baseline)
+    const healthBarDepth = 0.05;
+
+    // Background bar (dark gray)
+    const bgBarGeometry = new THREE.BoxGeometry(healthBarWidth, healthBarHeight, healthBarDepth);
+    const bgBarMaterial = new THREE.MeshBasicMaterial({ color: 0x333333 });
+    const bgBarMesh = new THREE.Mesh(bgBarGeometry, bgBarMaterial);
+    bgBarMesh.position.copy(position);
+    bgBarMesh.position.y += villagerHeight * scale + headRadius + 0.5; // Above head
+    scene.add(bgBarMesh);
+
+    // Health bar (green to red based on health)
+    const healthBarGeometry = new THREE.BoxGeometry(healthBarWidth, healthBarHeight, healthBarDepth + 0.01);
+    const healthBarMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+    const healthBarMesh = new THREE.Mesh(healthBarGeometry, healthBarMaterial);
+    healthBarMesh.position.copy(bgBarMesh.position);
+    healthBarMesh.position.z += 0.01; // Slightly in front of background
+    scene.add(healthBarMesh);
 
     // Physics - use cylinder for simpler collision with no bounce
     const shape = new CANNON.Cylinder(villagerRadius, villagerRadius, villagerHeight, 8);
@@ -775,12 +910,19 @@ function createVillager(position, isPrincess = false, villageId = 1) {
         mesh,
         headMesh,
         body,
-        height: villagerHeight * princessScale,
+        healthBarMesh,
+        bgBarMesh,
+        healthBarWidth,
+        height: villagerHeight * scale,
         currentWaypoint: 0, // 0 = waypoint1, 1 = waypoint2, 2 = summit
         target: firstWaypoint, // Start heading to first waypoint
         speed: 1.5, // Same speed for everyone
         alive: true,
         isPrincess: isPrincess,
+        isBrute: isBrute,
+        villagerType: villagerType,
+        health: maxHealth,
+        maxHealth: maxHealth,
         villageId: villageId, // Track which village this villager belongs to
         performingRitual: false,
         ritualTime: 0,
@@ -992,7 +1134,7 @@ function explodeBomb(obj) {
         }
     }
 
-    // Destroy villagers within blast radius
+    // Damage villagers within blast radius (2 damage from bomb)
     for (let i = villagers.length - 1; i >= 0; i--) {
         const villager = villagers[i];
         if (!villager.alive) continue;
@@ -1004,24 +1146,72 @@ function explodeBomb(obj) {
         );
 
         if (distance < blastRadius) {
-            // Increment kill count
-            gameState.villagerKillCount++;
+            // Deal 2 damage from bomb explosion
+            const died = damageVillager(villager, 2);
 
-            // Create black smoke at villager position
-            createBlackSmoke(villager.body.position);
-
-            // Remove villager
-            scene.remove(villager.mesh);
-            scene.remove(villager.headMesh);
-            world.removeBody(villager.body);
-
-            // Create ember at villager position
-            createEmber(villager.body.position);
-
-            // Remove from array
-            villagers.splice(i, 1);
+            // Remove from array if dead
+            if (died) {
+                villagers.splice(i, 1);
+            }
         }
     }
+}
+
+// Damage a villager and handle death if health reaches 0
+function damageVillager(villager, damage = 1) {
+    villager.health -= damage;
+
+    // Visual feedback - flash the villager brighter when hit
+    const originalEmissiveIntensity = villager.mesh.material.emissiveIntensity;
+    villager.mesh.material.emissiveIntensity = 5.0; // Flash bright
+
+    setTimeout(() => {
+        if (villager.mesh && villager.mesh.material) {
+            villager.mesh.material.emissiveIntensity = originalEmissiveIntensity;
+        }
+    }, 100);
+
+    // Update health bar
+    if (villager.health > 0) {
+        const healthPercent = villager.health / villager.maxHealth;
+
+        // Scale the health bar (scales from center)
+        villager.healthBarMesh.scale.set(healthPercent, 1, 1);
+
+        // Change color from green to yellow to red based on health
+        if (healthPercent > 0.6) {
+            villager.healthBarMesh.material.color.setHex(0x00ff00); // Green
+        } else if (healthPercent > 0.3) {
+            villager.healthBarMesh.material.color.setHex(0xffff00); // Yellow
+        } else {
+            villager.healthBarMesh.material.color.setHex(0xff0000); // Red
+        }
+    }
+
+    // Check if villager is dead
+    if (villager.health <= 0) {
+        villager.alive = false;
+
+        // Increment kill count
+        gameState.villagerKillCount++;
+
+        // Create black smoke at villager position
+        createBlackSmoke(villager.body.position);
+
+        // Remove villager
+        scene.remove(villager.mesh);
+        if (villager.headMesh) scene.remove(villager.headMesh);
+        scene.remove(villager.healthBarMesh);
+        scene.remove(villager.bgBarMesh);
+        world.removeBody(villager.body);
+
+        // Create ember at villager position
+        createEmber(villager.body.position);
+
+        return true; // Villager died
+    }
+
+    return false; // Villager still alive
 }
 
 // Spawn a group of villagers from a specific village
@@ -1037,6 +1227,9 @@ function spawnVillagerGroup(villageId = 1) {
         // Princess spawns at center (i = middle index), normal villagers around her
         const middleIndex = Math.floor(groupSize / 2);
         const isPrincess = (i === middleIndex);
+
+        // 30% chance for a non-princess villager to be a brute
+        const isBrute = !isPrincess && Math.random() < 0.3;
 
         // Calculate offset - princess at center (0), others spread around
         let offset;
@@ -1068,7 +1261,7 @@ function spawnVillagerGroup(villageId = 1) {
             spawnPos.y = winHeight - 5;
         }
 
-        createVillager(spawnPos, isPrincess, villageId);
+        createVillager(spawnPos, isPrincess, villageId, isBrute);
     }
 }
 
@@ -1344,6 +1537,12 @@ function updateUI() {
 function triggerGameOver() {
     gameState.gameOver = true;
 
+    // Release pointer lock so user can click buttons
+    if (document.pointerLockElement) {
+        document.exitPointerLock();
+    }
+    gameState.isPointerLocked = false;
+
     // Show game over screen
     const gameOverDiv = document.createElement('div');
     gameOverDiv.id = 'game-over';
@@ -1357,7 +1556,7 @@ function triggerGameOver() {
     gameOverDiv.style.borderRadius = '10px';
     gameOverDiv.style.textAlign = 'center';
     gameOverDiv.style.fontSize = '24px';
-    gameOverDiv.style.zIndex = '1000';
+    gameOverDiv.style.zIndex = '2000'; // Higher than everything else
 
     gameOverDiv.innerHTML = `
         <h1 style="color: #ff1493; margin-bottom: 20px;">GAME OVER</h1>
@@ -1372,6 +1571,16 @@ function triggerGameOver() {
             border-radius: 5px;
             cursor: pointer;
         ">Play Again</button>
+        <button id="gameover-settings-btn" style="
+            padding: 15px 30px;
+            font-size: 20px;
+            background: #666666;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-left: 20px;
+        ">Settings</button>
     `;
 
     document.body.appendChild(gameOverDiv);
@@ -1389,23 +1598,76 @@ function triggerGameOver() {
         restartGame();
     });
 
-    // Make sure button is clickable
+    // Make sure buttons are clickable
     restartBtn.style.pointerEvents = 'auto';
+    restartBtn.style.cursor = 'pointer';
     restartBtn.focus();
+
+    // Settings button on game over screen
+    const gameoverSettingsBtn = document.getElementById('gameover-settings-btn');
+    const openGameOverSettings = () => {
+        gameOverDiv.style.display = 'none';
+        document.getElementById('settings-screen').style.display = 'block';
+        settingsReturnScreen = 'game-over';
+        // Sync checkbox states with current settings
+        document.getElementById('invert-y-toggle').checked = gameState.invertMouseY;
+        document.getElementById('cutie-patootie-toggle').checked = gameState.cutiePatootieMode;
+    };
+    if (gameoverSettingsBtn) {
+        gameoverSettingsBtn.addEventListener('click', openGameOverSettings);
+        gameoverSettingsBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            openGameOverSettings();
+        });
+        gameoverSettingsBtn.style.pointerEvents = 'auto';
+        gameoverSettingsBtn.style.cursor = 'pointer';
+    }
+}
+
+// Function to start the game
+function startGame() {
+    gameState.started = true;
+    document.getElementById('start-screen').style.display = 'none';
+
+    // Start spawning villagers from both villages
+    const currentTime = clock.getElapsedTime();
+    lastSpawnTimeV1 = currentTime;
+    lastSpawnTimeV2 = currentTime;
+    spawnVillagerGroup(1);
+    spawnVillagerGroup(2);
+
+    // On desktop, show controls for first 10 seconds on first game
+    if (!isMobile) {
+        const hasPlayedBefore = localStorage.getItem('volcano-god-played');
+
+        if (!hasPlayedBefore) {
+            // First time playing - show controls for 10 seconds
+            const controlsDiv = document.getElementById('controls');
+            controlsDiv.style.display = 'block';
+
+            // Trigger fade-in after a tiny delay to ensure display:block takes effect
+            setTimeout(() => {
+                controlsDiv.style.opacity = '1';
+            }, 50);
+
+            setTimeout(() => {
+                controlsDiv.style.opacity = '0';
+                setTimeout(() => {
+                    controlsDiv.style.display = 'none';
+                }, 1000); // Wait for fade to complete
+            }, 10000); // Show for 10 seconds
+
+            // Mark as played
+            localStorage.setItem('volcano-god-played', 'true');
+        }
+    }
 }
 
 // Keyboard input
 document.addEventListener('keydown', (e) => {
     // Start game with spacebar if not started
     if (e.code === 'Space' && !gameState.started && !gameState.gameOver) {
-        gameState.started = true;
-        document.getElementById('start-screen').style.display = 'none';
-        // Start spawning villagers from both villages
-        const currentTime = clock.getElapsedTime();
-        lastSpawnTimeV1 = currentTime;
-        lastSpawnTimeV2 = currentTime;
-        spawnVillagerGroup(1);
-        spawnVillagerGroup(2);
+        startGame();
         e.preventDefault();
         return;
     }
@@ -1642,13 +1904,18 @@ freeFlyingBtn.addEventListener('touchstart', (e) => {
     toggleFreeFlying();
 });
 
+// Track where settings was opened from
+let settingsReturnScreen = 'pause-screen';
+
 // Settings button
 const settingsBtn = document.getElementById('settings-btn');
 const openSettings = () => {
     document.getElementById('pause-screen').style.display = 'none';
     document.getElementById('settings-screen').style.display = 'block';
-    // Sync checkbox state with current setting
+    settingsReturnScreen = 'pause-screen';
+    // Sync checkbox states with current settings
     document.getElementById('invert-y-toggle').checked = gameState.invertMouseY;
+    document.getElementById('cutie-patootie-toggle').checked = gameState.cutiePatootieMode;
 };
 settingsBtn.addEventListener('click', openSettings);
 settingsBtn.addEventListener('touchstart', (e) => {
@@ -1660,7 +1927,15 @@ settingsBtn.addEventListener('touchstart', (e) => {
 const settingsBackBtn = document.getElementById('settings-back-btn');
 const closeSettings = () => {
     document.getElementById('settings-screen').style.display = 'none';
-    document.getElementById('pause-screen').style.display = 'block';
+    // Return to whichever screen opened settings (pause or game over)
+    if (settingsReturnScreen === 'game-over') {
+        const gameOverDiv = document.getElementById('game-over');
+        if (gameOverDiv) {
+            gameOverDiv.style.display = 'block';
+        }
+    } else {
+        document.getElementById('pause-screen').style.display = 'block';
+    }
 };
 settingsBackBtn.addEventListener('click', closeSettings);
 settingsBackBtn.addEventListener('touchstart', (e) => {
@@ -1671,6 +1946,52 @@ settingsBackBtn.addEventListener('touchstart', (e) => {
 // Invert Y-axis toggle
 document.getElementById('invert-y-toggle').addEventListener('change', (e) => {
     gameState.invertMouseY = e.target.checked;
+});
+
+// Cutie Patootie Mode toggle (settings screen)
+document.getElementById('cutie-patootie-toggle').addEventListener('change', (e) => {
+    gameState.cutiePatootieMode = e.target.checked;
+    localStorage.setItem('volcano-god-cutie-mode', e.target.checked);
+
+    // Also sync the start screen checkbox
+    const startToggle = document.getElementById('start-cutie-patootie-toggle');
+    if (startToggle) {
+        startToggle.checked = e.target.checked;
+    }
+});
+
+// Start screen Cutie Patootie Mode toggle
+document.getElementById('start-cutie-patootie-toggle').addEventListener('change', (e) => {
+    gameState.cutiePatootieMode = e.target.checked;
+    localStorage.setItem('volcano-god-cutie-mode', e.target.checked);
+
+    // Also sync the settings screen checkbox if user opens it later
+    document.getElementById('cutie-patootie-toggle').checked = e.target.checked;
+});
+
+// Show Controls button
+const showControlsBtn = document.getElementById('show-controls-btn');
+const showControls = () => {
+    const controlsDiv = document.getElementById('controls');
+    controlsDiv.style.display = 'block';
+
+    // Trigger fade-in after a tiny delay to ensure display:block takes effect
+    setTimeout(() => {
+        controlsDiv.style.opacity = '1';
+    }, 50);
+
+    // Auto-hide after 10 seconds
+    setTimeout(() => {
+        controlsDiv.style.opacity = '0';
+        setTimeout(() => {
+            controlsDiv.style.display = 'none';
+        }, 1000); // Wait for fade to complete
+    }, 10000);
+};
+showControlsBtn.addEventListener('click', showControls);
+showControlsBtn.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    showControls();
 });
 
 // Show/hide UI elements based on device type
@@ -1688,6 +2009,9 @@ if (isMobile) {
 
     // Hide free flying button in pause menu
     document.getElementById('free-flying-btn').style.display = 'none';
+
+    // Hide Show Controls button on mobile (controls are for desktop only)
+    document.getElementById('show-controls-btn').style.display = 'none';
 
     // Mobile button event handlers
     const fireButton = document.getElementById('fire-button');
@@ -1731,14 +2055,7 @@ if (isMobile) {
     // Start game with touch on start screen
     document.getElementById('start-screen').addEventListener('touchstart', (e) => {
         if (!gameState.started && !gameState.gameOver) {
-            gameState.started = true;
-            document.getElementById('start-screen').style.display = 'none';
-            // Start spawning villagers from both villages
-            const currentTime = clock.getElapsedTime();
-            lastSpawnTimeV1 = currentTime;
-            lastSpawnTimeV2 = currentTime;
-            spawnVillagerGroup(1);
-            spawnVillagerGroup(2);
+            startGame();
         }
         e.preventDefault();
     });
@@ -1979,13 +2296,76 @@ function animate() {
 
         // Sync visual with physics
         villager.mesh.position.copy(villager.body.position);
-        villager.mesh.position.y -= villager.height / 2; // Adjust for cone base
 
-        // Sync head position (center of sphere at tip of cone)
-        villager.headMesh.position.copy(villager.body.position);
+        if (gameState.cutiePatootieMode && villager.mesh.isSprite) {
+            // SPRITE MODE: Handle sprite flipping based on movement direction relative to camera
+            // Position sprites based on their type
+            if (villager.isPrincess || villager.isBrute) {
+                // Position large sprites to glide over surface (not too low)
+                const spriteHeight = villager.height * 0.6; // Matches the sizeAdjust
+                villager.mesh.position.y = villager.body.position.y - villager.height / 2 + spriteHeight * 0.5;
+            } else {
+                // Center for normal villagers
+                villager.mesh.position.y = villager.body.position.y;
+            }
+
+            // Calculate movement direction
+            const velocity = villager.body.velocity;
+            if (velocity.x !== 0 || velocity.z !== 0) {
+                // Get camera's right vector (local X axis)
+                const cameraRight = new THREE.Vector3();
+                camera.getWorldDirection(cameraRight);
+                cameraRight.cross(new THREE.Vector3(0, 1, 0)); // Cross with up to get right
+                cameraRight.normalize();
+
+                // Project velocity onto camera's right vector
+                const movementVector = new THREE.Vector2(velocity.x, velocity.z);
+                const cameraRightVector = new THREE.Vector2(cameraRight.x, cameraRight.z);
+                const dotProduct = movementVector.dot(cameraRightVector);
+
+                // Flip sprite if moving right relative to camera
+                if (dotProduct > 0) {
+                    villager.mesh.material.map.repeat.x = -1; // Mirror horizontally
+                    villager.mesh.material.map.offset.x = 1; // Adjust offset for mirroring
+                } else {
+                    villager.mesh.material.map.repeat.x = 1; // Normal orientation
+                    villager.mesh.material.map.offset.x = 0;
+                }
+            }
+        } else {
+            // 3D MODEL MODE
+            villager.mesh.position.y -= villager.height / 2; // Adjust for cone base
+
+            // Sync head position (center of sphere at tip of cone)
+            if (villager.headMesh) {
+                villager.headMesh.position.copy(villager.body.position);
+            }
+        }
+
+        // Sync health bar positions to follow villager
+        const headRadius = villager.isPrincess || villager.isBrute
+            ? 0.4 * 3.0 * 0.36
+            : 0.4 * 3.0 * 0.72;
+        const healthBarY = villager.body.position.y + villager.height / 2 + headRadius + 0.5;
+
+        villager.bgBarMesh.position.set(
+            villager.body.position.x,
+            healthBarY,
+            villager.body.position.z
+        );
+        villager.healthBarMesh.position.set(
+            villager.body.position.x,
+            healthBarY,
+            villager.body.position.z
+        );
+
+        // Make health bars always face the camera (billboard effect)
+        villager.bgBarMesh.lookAt(camera.position);
+        villager.healthBarMesh.lookAt(camera.position);
 
         // Only sync quaternion if not performing ritual (ritual sets rotation manually)
-        if (!villager.performingRitual) {
+        // And only for 3D meshes, not sprites
+        if (!villager.performingRitual && !villager.mesh.isSprite) {
             villager.mesh.quaternion.copy(villager.body.quaternion);
         }
 
@@ -2068,7 +2448,7 @@ function animate() {
 
                     // Remove the princess
                     scene.remove(villager.mesh);
-                    scene.remove(villager.headMesh);
+                    if (villager.headMesh) scene.remove(villager.headMesh);
                     world.removeBody(villager.body);
                     villagers.splice(i, 1);
 
@@ -2169,23 +2549,17 @@ function animate() {
             const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
             if (distance < 2.0) { // Increased range for easier hits
-                // Destroy villager
-                gameState.villagerKillCount++;
-
-                // Create black smoke at villager position
-                createBlackSmoke(villager.body.position);
-
-                scene.remove(villager.mesh);
-                scene.remove(villager.headMesh);
-                world.removeBody(villager.body);
-
-                // Create ember at villager position
-                createEmber(villager.body.position);
+                // Deal 1 damage from lava hit
+                const died = damageVillager(villager, 1);
 
                 // Solidify the lava that hit the villager
                 solidifyLava(lava, true); // hitCollidable = true
 
-                villagers.splice(i, 1);
+                // Remove from array if dead
+                if (died) {
+                    villagers.splice(i, 1);
+                }
+
                 break;
             }
         }
