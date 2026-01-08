@@ -1376,12 +1376,20 @@ function triggerGameOver() {
 
     document.body.appendChild(gameOverDiv);
 
-    document.getElementById('restart-btn').addEventListener('click', () => {
+    const restartBtn = document.getElementById('restart-btn');
+
+    // Add both click and touch event listeners
+    const restartGame = () => {
         location.reload(); // Simple restart - reload the page
+    };
+
+    restartBtn.addEventListener('click', restartGame);
+    restartBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        restartGame();
     });
 
     // Make sure button is clickable
-    const restartBtn = document.getElementById('restart-btn');
     restartBtn.style.pointerEvents = 'auto';
     restartBtn.focus();
 }
@@ -1613,7 +1621,8 @@ if (isMobile) {
 }
 
 // Free-flying mode button
-document.getElementById('free-flying-btn').addEventListener('click', () => {
+const freeFlyingBtn = document.getElementById('free-flying-btn');
+const toggleFreeFlying = () => {
     gameState.freeFlying = !gameState.freeFlying;
     const btn = document.getElementById('free-flying-btn');
     if (gameState.freeFlying) {
@@ -1626,20 +1635,37 @@ document.getElementById('free-flying-btn').addEventListener('click', () => {
         mouseX = 0;
         mouseY = 0;
     }
+};
+freeFlyingBtn.addEventListener('click', toggleFreeFlying);
+freeFlyingBtn.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    toggleFreeFlying();
 });
 
 // Settings button
-document.getElementById('settings-btn').addEventListener('click', () => {
+const settingsBtn = document.getElementById('settings-btn');
+const openSettings = () => {
     document.getElementById('pause-screen').style.display = 'none';
     document.getElementById('settings-screen').style.display = 'block';
     // Sync checkbox state with current setting
     document.getElementById('invert-y-toggle').checked = gameState.invertMouseY;
+};
+settingsBtn.addEventListener('click', openSettings);
+settingsBtn.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    openSettings();
 });
 
 // Settings back button
-document.getElementById('settings-back-btn').addEventListener('click', () => {
+const settingsBackBtn = document.getElementById('settings-back-btn');
+const closeSettings = () => {
     document.getElementById('settings-screen').style.display = 'none';
     document.getElementById('pause-screen').style.display = 'block';
+};
+settingsBackBtn.addEventListener('click', closeSettings);
+settingsBackBtn.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    closeSettings();
 });
 
 // Invert Y-axis toggle
