@@ -1543,6 +1543,9 @@ function triggerGameOver() {
     }
     gameState.isPointerLocked = false;
 
+    // Disable pointer events on canvas so clicks pass through to UI buttons
+    renderer.domElement.style.pointerEvents = 'none';
+
     // Show game over screen
     const gameOverDiv = document.createElement('div');
     gameOverDiv.id = 'game-over';
