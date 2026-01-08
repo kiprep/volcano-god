@@ -80,20 +80,19 @@
         }
 
         /* Landscape mode adjustments for mobile */
-        @media screen and (orientation: landscape) and (max-height: 500px) {
-            #fire-button {
-                bottom: 15px;
-                left: 15px;
+        @media screen and (orientation: landscape) {
+            .mobile-button {
                 width: 70px;
                 height: 70px;
                 font-size: 12px;
             }
+            #fire-button {
+                bottom: 15px;
+                left: 15px;
+            }
             #switch-button {
                 bottom: 15px;
                 left: 105px;
-                width: 70px;
-                height: 70px;
-                font-size: 12px;
             }
             #pause-button {
                 top: 15px;

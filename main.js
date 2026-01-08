@@ -22,7 +22,7 @@ const gameState = {
     villagerKillCount: 0,
     gameOver: false,
     highestVillagerElevation: 0, // Percentage from village to win condition
-    invertMouseY: false, // Invert vertical mouse controls
+    invertMouseY: false, // Invert vertical mouse controls (set based on device type later)
 };
 
 // Input state
@@ -1481,50 +1481,78 @@ document.addEventListener('mousemove', (e) => {
     }
 });
 
-// Touch controls for camera aiming
+// Touch controls for camera aiming (multi-touch support)
+let cameraTrackingTouchId = null;
 let lastTouchX = 0;
 let lastTouchY = 0;
-let isTouching = false;
 
 document.addEventListener('touchstart', (e) => {
-    // Only handle camera touch if not touching a button
-    const touch = e.touches[0];
-    const target = e.target;
+    // Find a touch that's not on a UI button
+    for (let i = 0; i < e.touches.length; i++) {
+        const touch = e.touches[i];
+        const target = document.elementFromPoint(touch.clientX, touch.clientY);
 
-    // Ignore touches on UI buttons
-    if (target.classList.contains('mobile-button')) {
-        return;
+        // Skip if this touch is on a button
+        if (target && target.classList.contains('mobile-button')) {
+            continue;
+        }
+
+        // Use this touch for camera tracking if we don't have one yet
+        if (cameraTrackingTouchId === null) {
+            cameraTrackingTouchId = touch.identifier;
+            lastTouchX = touch.clientX;
+            lastTouchY = touch.clientY;
+            e.preventDefault();
+            break;
+        }
     }
-
-    isTouching = true;
-    lastTouchX = touch.clientX;
-    lastTouchY = touch.clientY;
-    e.preventDefault();
 }, { passive: false });
 
 document.addEventListener('touchmove', (e) => {
-    if (!isTouching) return;
+    if (cameraTrackingTouchId === null) return;
 
-    const touch = e.touches[0];
-    const deltaX = touch.clientX - lastTouchX;
-    const deltaY = touch.clientY - lastTouchY;
+    // Find our tracking touch
+    for (let i = 0; i < e.touches.length; i++) {
+        const touch = e.touches[i];
+        if (touch.identifier === cameraTrackingTouchId) {
+            const deltaX = touch.clientX - lastTouchX;
+            const deltaY = touch.clientY - lastTouchY;
 
-    // Apply touch movement to camera (similar to mouse)
-    const touchSensitivity = 0.005;
-    mouseX += deltaX * touchSensitivity;
-    const yMultiplier = gameState.invertMouseY ? -1 : 1;
-    mouseY += deltaY * touchSensitivity * yMultiplier;
+            // Apply touch movement to camera
+            const touchSensitivity = 0.005;
+            mouseX += deltaX * touchSensitivity;
+            const yMultiplier = gameState.invertMouseY ? -1 : 1;
+            mouseY += deltaY * touchSensitivity * yMultiplier;
 
-    // Clamp vertical look
-    mouseY = Math.max(-Math.PI / 3, Math.min(Math.PI / 6, mouseY));
+            // Clamp vertical look
+            mouseY = Math.max(-Math.PI / 3, Math.min(Math.PI / 6, mouseY));
 
-    lastTouchX = touch.clientX;
-    lastTouchY = touch.clientY;
-    e.preventDefault();
+            lastTouchX = touch.clientX;
+            lastTouchY = touch.clientY;
+            e.preventDefault();
+            break;
+        }
+    }
 }, { passive: false });
 
 document.addEventListener('touchend', (e) => {
-    isTouching = false;
+    // Check if our tracking touch ended
+    if (cameraTrackingTouchId !== null) {
+        let stillTouching = false;
+        for (let i = 0; i < e.touches.length; i++) {
+            if (e.touches[i].identifier === cameraTrackingTouchId) {
+                stillTouching = true;
+                break;
+            }
+        }
+        if (!stillTouching) {
+            cameraTrackingTouchId = null;
+        }
+    }
+});
+
+document.addEventListener('touchcancel', (e) => {
+    cameraTrackingTouchId = null;
 });
 
 // Handle window resize
@@ -1592,6 +1620,9 @@ document.getElementById('invert-y-toggle').addEventListener('change', (e) => {
 
 // Show/hide UI elements based on device type
 if (isMobile) {
+    // Mobile: don't invert vertical controls
+    gameState.invertMouseY = false;
+
     // Show mobile controls
     document.getElementById('fire-button').style.display = 'flex';
     document.getElementById('switch-button').style.display = 'flex';
@@ -1669,6 +1700,9 @@ if (isMobile) {
     pauseText.textContent = 'Tap || to Resume';
     pauseText.style.fontSize = '24px';
 } else {
+    // Desktop: invert vertical controls by default
+    gameState.invertMouseY = true;
+
     // Hide mobile controls on desktop
     document.getElementById('fire-button').style.display = 'none';
     document.getElementById('switch-button').style.display = 'none';
