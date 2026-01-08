@@ -29,12 +29,20 @@ Then open the URL shown in the terminal (usually http://localhost:5173) in your 
 Stop the princesses (large red cones) from reaching the caldera at the top of the volcano and completing their ritual! Princesses spawn from two villages (pink and lime green) on opposite sides of the volcano. Each princess is accompanied by escorts (smaller blue cones) that only move when near their princess.
 
 ### Controls
+
+#### Normal Mode
 - **Space**: Start game / Fire lava
 - **Mouse**: Look around
 - **A/D or Left/Right Arrow**: Rotate camera left/right
-- **Q/E**: Change lava type (Boulder/Spray/Liquid)
+- **Q/E**: Change lava type (Bomb/Boulder/Spray)
 - **Left Click or Space**: Fire lava
 - **Enter**: Pause/Resume
+
+#### Free-Flying Mode (Pause Menu)
+- Click "Toggle Free Flying Mode" button in pause menu
+- **WASD**: Move camera forward/left/backward/right
+- **Mouse**: Free look in any direction
+- **Enter**: Exit pause (automatically returns to spawn point)
 
 ### Game Mechanics
 - **Princesses** follow waypoints (yellow for Village 1, purple for Village 2) up the volcano
@@ -45,9 +53,14 @@ Stop the princesses (large red cones) from reaching the caldera at the top of th
 - Death markers (yellow cubes) despawn after 5 seconds
 
 ### Lava Types
-- **Boulder**: Single large projectile
-- **Spray**: Multiple smaller particles with spread
-- **Liquid**: (Not yet implemented)
+- **Bomb**: Large explosive projectile (costs 50% of total lava reserves)
+  - Creates massive explosion on impact
+  - Destroys trees within blast radius (10 units), creating wood splinters
+  - Destroys villagers within blast radius
+- **Boulder**: Single large projectile (costs 10 lava)
+  - Good for precision targeting
+- **Spray**: Multiple smaller particles with spread (costs 5 lava)
+  - Good for area coverage
 
 ## Technologies Used
 - Three.js - 3D rendering
@@ -68,4 +81,29 @@ volcano-god/
 - Caldera radius is 15% of base (9 units)
 - Win condition is at 90% height (27 units)
 - Villagers spawn every 10 seconds from each village
-- Debug mode is currently enabled (shows waypoint markers)
+- Debug mode is currently disabled
+- Island features procedural biome texturing:
+  - Beach zone (tan with dark brown specks) at low elevation
+  - Vegetation zone (green with brown splotches) in mid-elevation
+  - Rocky zone (gray with dark streaks) at high elevation
+  - Caldera interior (gray to red to yellow gradient)
+- Villages have green/brown terrain texture with colored roof cones (pink/lime green)
+- 30 palm trees are randomly distributed in the 25-60% radius band
+
+## Future Feature Wishlist
+
+### Deformable Terrain
+- Lava should add elevation where it solidifies, building up terrain over time
+- Bombs should create craters, lowering terrain elevation
+- Terrain deformation would affect villager pathfinding
+- Technical challenges:
+  - Dynamic mesh updates with real-time vertex modification
+  - Physics body synchronization with deformed terrain
+  - Biome texture reapplication on modified geometry
+  - Performance optimization for continuous updates
+
+### Liquid Flow Lava Mode
+- Lava that flows downhill following terrain contours
+- Creates rivers of lava that persist and deal damage over time
+- Would interact with deformable terrain system
+- Could solidify into permanent terrain features

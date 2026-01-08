@@ -2,12 +2,13 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 
 // Debug mode
-const debugMode = true;
+const debugMode = false;
 
 // Game state
 const gameState = {
     started: false, // Game hasn't started yet
     paused: false, // Game is paused
+    freeFlying: false, // Free-flying camera mode
     lavaType: 'boulder', // 'boulder', 'spray', or 'liquid' (liquid is stub for now)
     lavaAmount: 100,
     lavaMax: 100,
@@ -27,6 +28,11 @@ const input = {
     fire: false,
     changeTypeLeft: false,
     changeTypeRight: false,
+    // Free-flying controls
+    forward: false,
+    backward: false,
+    left: false,
+    right: false,
 };
 
 // Initialize Three.js
@@ -144,14 +150,117 @@ for (let i = 0; i < volcanoSegments; i++) {
     // Visualize the PHYSICS mesh directly (same size as collision)
     const visualGeometry = new THREE.CylinderGeometry(topRadius, bottomRadius, segmentHeight, 32, 1);
 
-    // Add color variation for terrain effect
+    // Add color variation for terrain effect with biomes
     const colors = [];
     const positions = visualGeometry.attributes.position;
     for (let j = 0; j < positions.count; j++) {
+        const x = positions.getX(j);
         const y = positions.getY(j);
-        const globalHeightRatio = (yPosPhysics - segmentHeight/2 + y + segmentHeight/2) / volcanoHeight;
-        const colorValue = 0.3 + globalHeightRatio * 0.4;
-        colors.push(colorValue, colorValue * 0.8, colorValue * 0.6);
+        const z = positions.getZ(j);
+
+        // Calculate global position
+        const globalY = yPosPhysics - segmentHeight/2 + y;
+        const globalHeightRatio = globalY / volcanoHeight;
+
+        // Calculate distance from center axis (horizontal distance)
+        const horizontalDist = Math.sqrt(x * x + z * z);
+        const radiusAtThisHeight = topRadius + (bottomRadius - topRadius) * ((segmentHeight/2 - y) / segmentHeight);
+        const normalizedDist = horizontalDist / radiusAtThisHeight; // 0 at center, 1 at edge
+
+        // Check if inside caldera (top section, near center)
+        const calderaRadius = volcanoRadius * 0.15;
+        const isInsideCaldera = globalHeightRatio > 0.85 && horizontalDist < calderaRadius * 1.2;
+
+        let r, g, b;
+
+        if (isInsideCaldera) {
+            // Inside caldera: gray around rim -> red -> yellow toward center
+            const calderaDepth = 1.0 - globalHeightRatio; // 0 at rim, higher going down
+            const centeredness = 1.0 - (horizontalDist / (calderaRadius * 1.2)); // 1 at center, 0 at edge
+
+            // Blend from gray (rim) to red to yellow (center)
+            const heatLevel = centeredness * 0.7 + calderaDepth * 0.3;
+
+            if (heatLevel < 0.3) {
+                // Gray rock
+                const grayValue = 0.4 + Math.random() * 0.2;
+                r = grayValue;
+                g = grayValue;
+                b = grayValue;
+            } else if (heatLevel < 0.6) {
+                // Red lava
+                r = 0.5 + Math.random() * 0.3;
+                g = 0.1 + Math.random() * 0.1;
+                b = 0.0;
+            } else {
+                // Yellow-orange hot lava
+                r = 0.9 + Math.random() * 0.1;
+                g = 0.7 + Math.random() * 0.2;
+                b = 0.1 + Math.random() * 0.1;
+            }
+        } else {
+            // Outside caldera: biomes based on height and distance
+            const beachEnd = 0.15; // Beach up to 15% height
+            const greenStart = 0.1;
+            const greenEnd = 0.6;
+            const rockyStart = 0.5;
+
+            // Add random variation for specks/splotches
+            const randValue = Math.random();
+
+            if (globalHeightRatio < beachEnd) {
+                // Beach biome: tan with dark brown specks
+                if (randValue < 0.15) {
+                    // Dark brown specks (15% chance)
+                    r = 0.2 + Math.random() * 0.1;
+                    g = 0.15 + Math.random() * 0.1;
+                    b = 0.05 + Math.random() * 0.05;
+                } else {
+                    // Tan/sand color
+                    r = 0.76 + Math.random() * 0.1;
+                    g = 0.70 + Math.random() * 0.1;
+                    b = 0.50 + Math.random() * 0.1;
+                }
+            } else if (globalHeightRatio < greenEnd) {
+                // Green vegetation zone with brown splotches
+                const greenIntensity = Math.min(1.0, (globalHeightRatio - greenStart) / (greenEnd - greenStart));
+
+                if (randValue < 0.2) {
+                    // Brown splotches (20% chance)
+                    r = 0.4 + Math.random() * 0.2;
+                    g = 0.3 + Math.random() * 0.15;
+                    b = 0.2 + Math.random() * 0.1;
+                } else {
+                    // Green vegetation
+                    r = 0.2 + Math.random() * 0.15;
+                    g = 0.4 + greenIntensity * 0.3 + Math.random() * 0.2;
+                    b = 0.15 + Math.random() * 0.1;
+                }
+            } else {
+                // Rocky zone: gray with streaks
+                const rockyIntensity = (globalHeightRatio - rockyStart) / (1.0 - rockyStart);
+
+                // Create vertical streaks using x position
+                const streakValue = Math.sin(Math.atan2(z, x) * 5 + Math.random() * 0.5);
+                const isStreak = streakValue > 0.3;
+
+                if (isStreak || randValue < 0.3) {
+                    // Dark gray streaks
+                    const grayValue = 0.25 + Math.random() * 0.15;
+                    r = grayValue;
+                    g = grayValue;
+                    b = grayValue;
+                } else {
+                    // Lighter gray rock
+                    const grayValue = 0.45 + Math.random() * 0.2;
+                    r = grayValue;
+                    g = grayValue * 0.95;
+                    b = grayValue * 0.9;
+                }
+            }
+        }
+
+        colors.push(r, g, b);
     }
     visualGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 
@@ -162,51 +271,186 @@ for (let i = 0; i < volcanoSegments; i++) {
     scene.add(visualMesh);
 }
 
-// Create villages (pink and lime green cylinders) near the shoreline
+// Create villages near the shoreline
 const villageRadius = 8; // Much larger
 const villageHeight = 2; // Taller
-const villageGeometry = new THREE.CylinderGeometry(villageRadius, villageRadius, villageHeight, 16);
 
 // Position villages on the slope near the shoreline
 const villageDistanceFromCenter = volcanoRadius * 0.6; // Mid-slope, more visible
 
-// Village 1 (Pink) - 45 degrees
+// Village 1 - 45 degrees
 const village1Angle = Math.PI / 4; // 45 degrees around
 const village1X = Math.cos(village1Angle) * villageDistanceFromCenter;
 const village1Z = Math.sin(village1Angle) * villageDistanceFromCenter;
 const distanceRatio = villageDistanceFromCenter / volcanoRadius;
 const villageHeightOnSlope = volcanoHeight * (1 - distanceRatio);
 
-const village1Material = new THREE.MeshStandardMaterial({
-    color: 0xff69b4, // Hot pink
-    roughness: 0.8,
-    emissive: 0xff1493, // Pink glow
-    emissiveIntensity: 0.3,
-});
+// Create village 1 geometry with island biome colors
+const village1Geometry = new THREE.CylinderGeometry(villageRadius, villageRadius, villageHeight, 32);
+const village1Colors = [];
+const village1Positions = village1Geometry.attributes.position;
+for (let j = 0; j < village1Positions.count; j++) {
+    const x = village1Positions.getX(j);
+    const y = village1Positions.getY(j);
+    const z = village1Positions.getZ(j);
 
-const village1 = new THREE.Mesh(villageGeometry, village1Material);
-village1.position.set(village1X, villageHeightOnSlope - villageHeight * 0.25, village1Z);
+    // Calculate global position
+    const globalX = village1X + x;
+    const globalZ = village1Z + z;
+    const globalY = villageHeightOnSlope + villageHeight / 2 + y;
+    const globalHeightRatio = globalY / volcanoHeight;
+
+    // Apply same biome logic as island (green zone with brown splotches)
+    const greenEnd = 0.6;
+    const greenStart = 0.1;
+    const randValue = Math.random();
+
+    let r, g, b;
+    if (globalHeightRatio < greenEnd) {
+        const greenIntensity = Math.min(1.0, (globalHeightRatio - greenStart) / (greenEnd - greenStart));
+
+        if (randValue < 0.2) {
+            // Brown splotches (20% chance)
+            r = 0.4 + Math.random() * 0.2;
+            g = 0.3 + Math.random() * 0.15;
+            b = 0.2 + Math.random() * 0.1;
+        } else {
+            // Green vegetation
+            r = 0.2 + Math.random() * 0.15;
+            g = 0.4 + greenIntensity * 0.3 + Math.random() * 0.2;
+            b = 0.15 + Math.random() * 0.1;
+        }
+    } else {
+        // Fallback green
+        r = 0.2;
+        g = 0.5;
+        b = 0.15;
+    }
+
+    village1Colors.push(r, g, b);
+}
+village1Geometry.setAttribute('color', new THREE.Float32BufferAttribute(village1Colors, 3));
+
+const village1 = new THREE.Mesh(village1Geometry, volcanoMaterial);
+village1.position.set(village1X, villageHeightOnSlope + villageHeight / 2, village1Z);
 village1.receiveShadow = true;
 village1.castShadow = true;
 scene.add(village1);
 
-// Village 2 (Lime Green) - opposite side (225 degrees)
+// Add roof cones to village 1
+const roofCount1 = 8 + Math.floor(Math.random() * 5); // 8-12 roofs
+for (let i = 0; i < roofCount1; i++) {
+    const roofSize = (0.8 + Math.random() * 0.6) * 1.25; // Vary size, 25% larger
+    const roofHeight = (1.5 + Math.random() * 1.0) * 1.25; // 25% larger
+    const roofGeometry = new THREE.ConeGeometry(roofSize, roofHeight, 6);
+
+    // Darker pink for roofs (original color)
+    const tintVariation = 0.7 + Math.random() * 0.2; // 0.7-0.9 multiplier
+    const roofMaterial = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(0xff69b4).multiplyScalar(tintVariation),
+        roughness: 0.9,
+    });
+
+    const roof = new THREE.Mesh(roofGeometry, roofMaterial);
+
+    // Random position within village radius
+    const angle = Math.random() * Math.PI * 2;
+    const dist = Math.random() * (villageRadius * 0.8);
+    const roofX = village1X + Math.cos(angle) * dist;
+    const roofZ = village1Z + Math.sin(angle) * dist;
+    const roofY = village1.position.y + villageHeight / 2 + roofHeight / 2;
+
+    roof.position.set(roofX, roofY, roofZ);
+    roof.castShadow = true;
+    roof.receiveShadow = true;
+    scene.add(roof);
+}
+
+// Village 2 - opposite side (225 degrees)
 const village2Angle = Math.PI / 4 + Math.PI; // 225 degrees (opposite side)
 const village2X = Math.cos(village2Angle) * villageDistanceFromCenter;
 const village2Z = Math.sin(village2Angle) * villageDistanceFromCenter;
 
-const village2Material = new THREE.MeshStandardMaterial({
-    color: 0x00ff00, // Lime green
-    roughness: 0.8,
-    emissive: 0x00cc00, // Green glow
-    emissiveIntensity: 0.3,
-});
+// Create village 2 geometry with island biome colors
+const village2Geometry = new THREE.CylinderGeometry(villageRadius, villageRadius, villageHeight, 32);
+const village2Colors = [];
+const village2Positions = village2Geometry.attributes.position;
+for (let j = 0; j < village2Positions.count; j++) {
+    const x = village2Positions.getX(j);
+    const y = village2Positions.getY(j);
+    const z = village2Positions.getZ(j);
 
-const village2 = new THREE.Mesh(villageGeometry, village2Material);
-village2.position.set(village2X, villageHeightOnSlope - villageHeight * 0.25, village2Z);
+    // Calculate global position
+    const globalX = village2X + x;
+    const globalZ = village2Z + z;
+    const globalY = villageHeightOnSlope + villageHeight / 2 + y;
+    const globalHeightRatio = globalY / volcanoHeight;
+
+    // Apply same biome logic as island (green zone with brown splotches)
+    const greenEnd = 0.6;
+    const greenStart = 0.1;
+    const randValue = Math.random();
+
+    let r, g, b;
+    if (globalHeightRatio < greenEnd) {
+        const greenIntensity = Math.min(1.0, (globalHeightRatio - greenStart) / (greenEnd - greenStart));
+
+        if (randValue < 0.2) {
+            // Brown splotches (20% chance)
+            r = 0.4 + Math.random() * 0.2;
+            g = 0.3 + Math.random() * 0.15;
+            b = 0.2 + Math.random() * 0.1;
+        } else {
+            // Green vegetation
+            r = 0.2 + Math.random() * 0.15;
+            g = 0.4 + greenIntensity * 0.3 + Math.random() * 0.2;
+            b = 0.15 + Math.random() * 0.1;
+        }
+    } else {
+        // Fallback green
+        r = 0.2;
+        g = 0.5;
+        b = 0.15;
+    }
+
+    village2Colors.push(r, g, b);
+}
+village2Geometry.setAttribute('color', new THREE.Float32BufferAttribute(village2Colors, 3));
+
+const village2 = new THREE.Mesh(village2Geometry, volcanoMaterial);
+village2.position.set(village2X, villageHeightOnSlope + villageHeight / 2, village2Z);
 village2.receiveShadow = true;
 village2.castShadow = true;
 scene.add(village2);
+
+// Add roof cones to village 2
+const roofCount2 = 8 + Math.floor(Math.random() * 5); // 8-12 roofs
+for (let i = 0; i < roofCount2; i++) {
+    const roofSize = (0.8 + Math.random() * 0.6) * 1.25; // Vary size, 25% larger
+    const roofHeight = (1.5 + Math.random() * 1.0) * 1.25; // 25% larger
+    const roofGeometry = new THREE.ConeGeometry(roofSize, roofHeight, 6);
+
+    // Darker green for roofs (original color)
+    const tintVariation = 0.7 + Math.random() * 0.2; // 0.7-0.9 multiplier
+    const roofMaterial = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(0x00ff00).multiplyScalar(tintVariation),
+        roughness: 0.9,
+    });
+
+    const roof = new THREE.Mesh(roofGeometry, roofMaterial);
+
+    // Random position within village radius
+    const angle = Math.random() * Math.PI * 2;
+    const dist = Math.random() * (villageRadius * 0.8);
+    const roofX = village2X + Math.cos(angle) * dist;
+    const roofZ = village2Z + Math.sin(angle) * dist;
+    const roofY = village2.position.y + villageHeight / 2 + roofHeight / 2;
+
+    roof.position.set(roofX, roofY, roofZ);
+    roof.castShadow = true;
+    roof.receiveShadow = true;
+    scene.add(roof);
+}
 
 // Keep reference for backward compatibility
 const village = village1;
@@ -373,7 +617,7 @@ const embers = [];
 const particles = [];
 
 // Lava types array for cycling
-const lavaTypes = ['boulder', 'spray'];
+const lavaTypes = ['bomb', 'boulder', 'spray'];
 
 // Physics material for villagers
 const villagerMat = new CANNON.Material('villager');
@@ -640,6 +884,124 @@ function createLavaSmoke(position) {
     });
 }
 
+// Create wood splinters (tree destruction)
+function createWoodSplinters(position) {
+    const splinterCount = 20;
+    for (let i = 0; i < splinterCount; i++) {
+        // Thin rectangular splinters
+        const length = 0.3 + Math.random() * 0.5;
+        const width = 0.05 + Math.random() * 0.05;
+        const geometry = new THREE.BoxGeometry(width, length, width);
+        const material = new THREE.MeshBasicMaterial({
+            color: 0x8b4513, // Brown
+            transparent: true,
+            opacity: 1.0,
+        });
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.copy(position);
+
+        // Random rotation for variety
+        mesh.rotation.set(
+            Math.random() * Math.PI,
+            Math.random() * Math.PI,
+            Math.random() * Math.PI
+        );
+
+        scene.add(mesh);
+
+        // Explosive outward velocity
+        const angle = Math.random() * Math.PI * 2;
+        const elevation = Math.random() * Math.PI / 3; // Up to 60 degrees up
+        const speed = 5 + Math.random() * 5;
+
+        const velocity = new THREE.Vector3(
+            Math.cos(angle) * Math.sin(elevation) * speed,
+            Math.cos(elevation) * speed,
+            Math.sin(angle) * Math.sin(elevation) * speed
+        );
+
+        particles.push({
+            mesh,
+            velocity,
+            age: 0,
+            lifetime: 1.5, // Splinters last 1.5 seconds
+            initialOpacity: 1.0
+        });
+    }
+}
+
+// Explode a bomb with blast radius
+function explodeBomb(obj) {
+    const blastRadius = 10.0; // Large blast area
+    const explosionPos = obj.body.position;
+
+    // Create massive explosion particles (red/orange/yellow)
+    createParticles(explosionPos, 40, 0xff6600, 12, 1.5, Math.PI); // Orange
+    createParticles(explosionPos, 30, 0xff0000, 10, 1.3, Math.PI); // Red
+    createParticles(explosionPos, 20, 0xffff00, 15, 1.2, Math.PI); // Yellow
+
+    // Remove the bomb itself
+    scene.remove(obj.mesh);
+    world.removeBody(obj.body);
+    const bombIndex = physicsObjects.indexOf(obj);
+    if (bombIndex > -1) physicsObjects.splice(bombIndex, 1);
+
+    // Destroy trees within blast radius
+    for (let i = trees.length - 1; i >= 0; i--) {
+        const tree = trees[i];
+        const distance = Math.sqrt(
+            Math.pow(explosionPos.x - tree.position.x, 2) +
+            Math.pow(explosionPos.y - tree.position.y, 2) +
+            Math.pow(explosionPos.z - tree.position.z, 2)
+        );
+
+        if (distance < blastRadius) {
+            // Create wood splinters at tree position
+            createWoodSplinters(tree.position);
+
+            // Remove tree visual elements
+            scene.remove(tree.trunk);
+            scene.remove(tree.frondGroup);
+
+            // Remove tree physics body
+            world.removeBody(tree.body);
+
+            // Remove from trees array
+            trees.splice(i, 1);
+        }
+    }
+
+    // Destroy villagers within blast radius
+    for (let i = villagers.length - 1; i >= 0; i--) {
+        const villager = villagers[i];
+        if (!villager.alive) continue;
+
+        const distance = Math.sqrt(
+            Math.pow(explosionPos.x - villager.body.position.x, 2) +
+            Math.pow(explosionPos.y - villager.body.position.y, 2) +
+            Math.pow(explosionPos.z - villager.body.position.z, 2)
+        );
+
+        if (distance < blastRadius) {
+            // Increment kill count
+            gameState.villagerKillCount++;
+
+            // Create black smoke at villager position
+            createBlackSmoke(villager.body.position);
+
+            // Remove villager
+            scene.remove(villager.mesh);
+            world.removeBody(villager.body);
+
+            // Create ember at villager position
+            createEmber(villager.body.position);
+
+            // Remove from array
+            villagers.splice(i, 1);
+        }
+    }
+}
+
 // Spawn a group of villagers from a specific village
 function spawnVillagerGroup(villageId = 1) {
     if (gameState.gameOver || !gameState.started) {
@@ -816,10 +1178,52 @@ function createSpray(position, velocity) {
     }
 }
 
+// Create a bomb (large explosive projectile)
+function createBomb(position, velocity) {
+    const radius = 0.8; // Larger than boulder
+    const geometry = new THREE.SphereGeometry(radius, 16, 16);
+
+    // Dark gray/black with some lighter spots
+    const material = new THREE.MeshStandardMaterial({
+        color: 0x333333, // Dark gray
+        emissive: 0xff0000, // Red glow (danger)
+        emissiveIntensity: 0.8,
+        roughness: 0.6,
+        metalness: 0.3,
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.copy(position);
+    mesh.castShadow = true;
+    scene.add(mesh);
+
+    // Physics
+    const shape = new CANNON.Sphere(radius);
+    const body = new CANNON.Body({
+        mass: 10, // Heavier than boulder
+        material: lavaMat,
+        linearDamping: 0.3,
+        angularDamping: 0.3,
+    });
+    body.addShape(shape);
+    body.position.copy(position);
+    body.velocity.copy(velocity);
+    world.addBody(body);
+
+    const obj = { mesh, body, type: 'bomb', age: 0, hasCollided: false, isHot: true };
+
+    // Track collisions for this object
+    body.addEventListener('collide', (e) => {
+        obj.hasCollided = true;
+    });
+
+    physicsObjects.push(obj);
+}
+
 // Fire lava based on current type
 function fireLava() {
     // Check if we have enough lava
-    const cost = gameState.lavaType === 'boulder' ? 10 :
+    const cost = gameState.lavaType === 'bomb' ? gameState.lavaMax * 0.5 : // 50% of total reserves
+                 gameState.lavaType === 'boulder' ? 10 :
                  gameState.lavaType === 'spray' ? 5 : 20;
 
     if (gameState.lavaAmount < cost) return;
@@ -845,7 +1249,9 @@ function fireLava() {
     );
 
     // Fire based on type
-    if (gameState.lavaType === 'boulder') {
+    if (gameState.lavaType === 'bomb') {
+        createBomb(position, velocity);
+    } else if (gameState.lavaType === 'boulder') {
         createBoulder(position, velocity);
     } else if (gameState.lavaType === 'spray') {
         createSpray(position, velocity);
@@ -944,25 +1350,63 @@ document.addEventListener('keydown', (e) => {
             pauseScreen.style.display = 'block';
         } else {
             pauseScreen.style.display = 'none';
+
+            // Reset camera to spawn point when exiting pause
+            if (gameState.freeFlying) {
+                // Exit free flying mode
+                gameState.freeFlying = false;
+                const btn = document.getElementById('free-flying-btn');
+                btn.style.background = '#4169e1'; // Blue when inactive
+                btn.textContent = 'Toggle Free Flying Mode';
+            }
+
+            // Reset camera to original spawn position
+            camera.position.set(0, cameraHeight, cameraRadius);
+
+            // Reset mouse look
+            mouseX = 0;
+            mouseY = 0;
+
+            // Reset rotation
+            gameState.rotation = 0;
         }
         e.preventDefault();
         return;
     }
 
-    if (e.code === 'KeyA' || e.code === 'ArrowLeft') input.rotateLeft = true;
-    if (e.code === 'KeyD' || e.code === 'ArrowRight') input.rotateRight = true;
-    if (e.code === 'Space') {
-        input.fire = true;
-        e.preventDefault();
+    // Handle keys differently based on mode
+    if (gameState.freeFlying) {
+        // Free-flying mode: WASD for movement
+        if (e.code === 'KeyW') input.forward = true;
+        if (e.code === 'KeyS') input.backward = true;
+        if (e.code === 'KeyA') input.left = true;
+        if (e.code === 'KeyD') input.right = true;
+    } else {
+        // Normal mode: A/D for rotation
+        if (e.code === 'KeyA' || e.code === 'ArrowLeft') input.rotateLeft = true;
+        if (e.code === 'KeyD' || e.code === 'ArrowRight') input.rotateRight = true;
+        if (e.code === 'Space') {
+            input.fire = true;
+            e.preventDefault();
+        }
+        if (e.code === 'KeyQ') changeLavaType(-1);
+        if (e.code === 'KeyE') changeLavaType(1);
     }
-    if (e.code === 'KeyQ') changeLavaType(-1);
-    if (e.code === 'KeyE') changeLavaType(1);
 });
 
 document.addEventListener('keyup', (e) => {
-    if (e.code === 'KeyA' || e.code === 'ArrowLeft') input.rotateLeft = false;
-    if (e.code === 'KeyD' || e.code === 'ArrowRight') input.rotateRight = false;
-    if (e.code === 'Space') input.fire = false;
+    if (gameState.freeFlying) {
+        // Free-flying mode
+        if (e.code === 'KeyW') input.forward = false;
+        if (e.code === 'KeyS') input.backward = false;
+        if (e.code === 'KeyA') input.left = false;
+        if (e.code === 'KeyD') input.right = false;
+    } else {
+        // Normal mode
+        if (e.code === 'KeyA' || e.code === 'ArrowLeft') input.rotateLeft = false;
+        if (e.code === 'KeyD' || e.code === 'ArrowRight') input.rotateRight = false;
+        if (e.code === 'Space') input.fire = false;
+    }
 });
 
 // Mouse input for firing
@@ -1003,6 +1447,22 @@ window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// Free-flying mode button
+document.getElementById('free-flying-btn').addEventListener('click', () => {
+    gameState.freeFlying = !gameState.freeFlying;
+    const btn = document.getElementById('free-flying-btn');
+    if (gameState.freeFlying) {
+        btn.style.background = '#00cc00'; // Green when active
+        btn.textContent = 'Exit Free Flying Mode';
+    } else {
+        btn.style.background = '#4169e1'; // Blue when inactive
+        btn.textContent = 'Toggle Free Flying Mode';
+        // Reset camera rotation when exiting free-flying
+        mouseX = 0;
+        mouseY = 0;
+    }
 });
 
 // Fire rate limiting
@@ -1076,6 +1536,10 @@ let lastSpawnTimeV1 = 0;
 let lastSpawnTimeV2 = 0;
 const spawnInterval = 10; // seconds
 
+// Caldera smoke
+let lastCalderaSmokeTime = 0;
+const calderaSmokeInterval = 0.3; // Spawn smoke every 0.3 seconds
+
 // Animation loop
 const clock = new THREE.Clock();
 let lastTime = 0;
@@ -1087,14 +1551,10 @@ function animate() {
     const deltaTime = currentTime - lastTime;
     lastTime = currentTime;
 
-    // Skip updates if paused, but still render
-    if (gameState.paused) {
-        renderer.render(scene, camera);
-        return;
-    }
-
-    // Update physics
-    world.step(1 / 60, deltaTime, 3);
+    // Update physics and game logic only if not paused
+    if (!gameState.paused) {
+        // Update physics
+        world.step(1 / 60, deltaTime, 3);
 
     // Sync physics objects with Three.js and check for solidification
     for (let i = physicsObjects.length - 1; i >= 0; i--) {
@@ -1134,6 +1594,12 @@ function animate() {
                     break;
                 }
             }
+        }
+
+        // Check if bomb should explode
+        if (obj.type === 'bomb' && (obj.hasCollided || hitCollidable)) {
+            explodeBomb(obj);
+            continue; // Skip the rest of the loop for this object
         }
 
         // Check if lava should solidify
@@ -1182,8 +1648,18 @@ function animate() {
         particle.mesh.position.y += particle.velocity.y * deltaTime;
         particle.mesh.position.z += particle.velocity.z * deltaTime;
 
-        // Apply gravity to particles
-        particle.velocity.y -= 9.8 * deltaTime;
+        // Special handling for caldera smoke
+        if (particle.isCalderaSmoke) {
+            // Cap the height so smoke doesn't obscure camera
+            if (particle.mesh.position.y > particle.maxHeight) {
+                particle.mesh.position.y = particle.maxHeight;
+                particle.velocity.y = 0; // Stop rising
+            }
+            // No gravity for smoke - it just drifts
+        } else {
+            // Apply gravity to other particles (impact effects, etc.)
+            particle.velocity.y -= 9.8 * deltaTime;
+        }
 
         // Fade out over lifetime
         const lifeRatio = particle.age / particle.lifetime;
@@ -1310,6 +1786,37 @@ function animate() {
                 );
                 directionXZ.normalize();
 
+                // Add obstacle avoidance - repulsion from nearby trees
+                const avoidanceRadius = 3.0; // How far to detect trees
+                const avoidanceStrength = 2.0; // How strongly to avoid
+                let avoidanceForce = new THREE.Vector2(0, 0);
+
+                for (let t = 0; t < trees.length; t++) {
+                    const tree = trees[t];
+                    const treePos = new THREE.Vector2(tree.position.x, tree.position.z);
+                    const villagerPos = new THREE.Vector2(villager.body.position.x, villager.body.position.z);
+                    const distanceToTree = villagerPos.distanceTo(treePos);
+
+                    if (distanceToTree < avoidanceRadius) {
+                        // Calculate repulsion direction (away from tree)
+                        const repulsion = new THREE.Vector2(
+                            villagerPos.x - treePos.x,
+                            villagerPos.y - treePos.y
+                        );
+                        repulsion.normalize();
+
+                        // Stronger repulsion when closer
+                        const strength = (1 - (distanceToTree / avoidanceRadius)) * avoidanceStrength;
+                        repulsion.multiplyScalar(strength);
+
+                        avoidanceForce.add(repulsion);
+                    }
+                }
+
+                // Blend target direction with avoidance
+                directionXZ.add(avoidanceForce);
+                directionXZ.normalize();
+
                 // Direct velocity control for horizontal movement
                 const moveSpeed = villager.speed * 1.5; // Slower, more manageable speed
                 villager.body.velocity.x = directionXZ.x * moveSpeed;
@@ -1381,6 +1888,51 @@ function animate() {
         }
     }
 
+    // Generate caldera smoke periodically
+    if (currentTime - lastCalderaSmokeTime > calderaSmokeInterval) {
+        // Spawn smoke at random positions within the caldera center
+        const calderaRadius = volcanoRadius * 0.08; // Small area in center
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.random() * calderaRadius;
+
+        const smokeX = Math.cos(angle) * dist;
+        const smokeZ = Math.sin(angle) * dist;
+        const smokeY = volcanoHeight - 2; // Just below the rim
+
+        const smokePos = new THREE.Vector3(smokeX, smokeY, smokeZ);
+
+        // Create a single smoke particle with custom behavior
+        const size = 0.3 + Math.random() * 0.4;
+        const geometry = new THREE.SphereGeometry(size, 6, 6);
+        const material = new THREE.MeshBasicMaterial({
+            color: 0x333333,
+            transparent: true,
+            opacity: 0.6,
+        });
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.copy(smokePos);
+        scene.add(mesh);
+
+        // Slow upward drift, but cap the height
+        const velocity = new THREE.Vector3(
+            (Math.random() - 0.5) * 0.5,
+            1.0 + Math.random() * 0.5, // Slow rise
+            (Math.random() - 0.5) * 0.5
+        );
+
+        particles.push({
+            mesh,
+            velocity,
+            age: 0,
+            lifetime: 4.0, // Lasts 4 seconds
+            initialOpacity: 0.6,
+            isCalderaSmoke: true,
+            maxHeight: volcanoHeight + 6 // Don't rise above this
+        });
+
+        lastCalderaSmokeTime = currentTime;
+    }
+
     // Spawn villagers periodically from both villages (only if game is started and not over)
     if (!gameState.gameOver && gameState.started) {
         // Spawn from village 1
@@ -1395,34 +1947,72 @@ function animate() {
             lastSpawnTimeV2 = currentTime;
         }
     }
+    } // End of !gameState.paused block
 
-    // Handle rotation
-    if (input.rotateLeft) {
-        gameState.rotation += gameState.rotationSpeed * deltaTime;
+    // Camera control based on mode (works even when paused in free-flying mode)
+    if (gameState.freeFlying) {
+        // Free-flying mode: WASD moves camera, mouse controls look direction
+        const moveSpeed = 30; // Units per second
+        const forward = new THREE.Vector3();
+        const right = new THREE.Vector3();
+
+        // Get camera's forward and right vectors
+        camera.getWorldDirection(forward);
+        right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+
+        // Move based on input
+        if (input.forward) {
+            camera.position.addScaledVector(forward, moveSpeed * deltaTime);
+        }
+        if (input.backward) {
+            camera.position.addScaledVector(forward, -moveSpeed * deltaTime);
+        }
+        if (input.left) {
+            camera.position.addScaledVector(right, -moveSpeed * deltaTime);
+        }
+        if (input.right) {
+            camera.position.addScaledVector(right, moveSpeed * deltaTime);
+        }
+
+        // Apply mouse look (free rotation)
+        const lookDirection = new THREE.Vector3(
+            Math.sin(mouseX) * Math.cos(mouseY),
+            -Math.sin(mouseY),
+            Math.cos(mouseX) * Math.cos(mouseY)
+        );
+        lookDirection.normalize();
+        lookDirection.multiplyScalar(10);
+        lookDirection.add(camera.position);
+        camera.lookAt(lookDirection);
+    } else {
+        // Normal mode: rotation around volcano
+        if (input.rotateLeft) {
+            gameState.rotation += gameState.rotationSpeed * deltaTime;
+        }
+        if (input.rotateRight) {
+            gameState.rotation -= gameState.rotationSpeed * deltaTime;
+        }
+
+        // Update camera position based on rotation
+        const camX = Math.sin(gameState.rotation) * cameraRadius;
+        const camZ = Math.cos(gameState.rotation) * cameraRadius;
+        camera.position.x = camX;
+        camera.position.z = camZ;
+
+        // Apply mouse look (pitch and yaw)
+        const lookDirection = new THREE.Vector3(
+            Math.sin(gameState.rotation + mouseX),
+            -Math.tan(mouseY),
+            Math.cos(gameState.rotation + mouseX)
+        );
+        lookDirection.normalize();
+        lookDirection.multiplyScalar(10);
+        lookDirection.add(camera.position);
+        camera.lookAt(lookDirection);
     }
-    if (input.rotateRight) {
-        gameState.rotation -= gameState.rotationSpeed * deltaTime;
-    }
 
-    // Update camera position based on rotation and mouse look
-    const camX = Math.sin(gameState.rotation) * cameraRadius;
-    const camZ = Math.cos(gameState.rotation) * cameraRadius;
-    camera.position.x = camX;
-    camera.position.z = camZ;
-
-    // Apply mouse look (pitch and yaw)
-    const lookDirection = new THREE.Vector3(
-        Math.sin(gameState.rotation + mouseX),
-        -Math.tan(mouseY),
-        Math.cos(gameState.rotation + mouseX)
-    );
-    lookDirection.normalize();
-    lookDirection.multiplyScalar(10);
-    lookDirection.add(camera.position);
-    camera.lookAt(lookDirection);
-
-    // Handle firing (only if game is started and not over)
-    if (input.fire && gameState.started && !gameState.gameOver) {
+    // Handle firing (only if game is started, not over, and not paused)
+    if (input.fire && gameState.started && !gameState.gameOver && !gameState.paused) {
         const now = Date.now();
         if (now - lastFireTime > fireRate) {
             fireLava();
@@ -1430,11 +2020,13 @@ function animate() {
         }
     }
 
-    // Regenerate lava
-    gameState.lavaAmount = Math.min(
-        gameState.lavaMax,
-        gameState.lavaAmount + gameState.lavaRegenRate * deltaTime
-    );
+    // Regenerate lava (only when not paused)
+    if (!gameState.paused) {
+        gameState.lavaAmount = Math.min(
+            gameState.lavaMax,
+            gameState.lavaAmount + gameState.lavaRegenRate * deltaTime
+        );
+    }
 
     updateUI();
     renderer.render(scene, camera);
