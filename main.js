@@ -1969,6 +1969,36 @@ document.getElementById('start-cutie-patootie-toggle').addEventListener('change'
     document.getElementById('cutie-patootie-toggle').checked = e.target.checked;
 });
 
+// Mobile-specific touch handlers for checkboxes (to ensure they work on touch devices)
+if (isMobile) {
+    // Helper function to toggle checkbox on touch
+    const addCheckboxTouchHandler = (checkboxId) => {
+        const checkbox = document.getElementById(checkboxId);
+        const label = checkbox.closest('label') || checkbox.parentElement.querySelector('label');
+
+        const toggleCheckbox = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            checkbox.checked = !checkbox.checked;
+            // Trigger the change event manually
+            checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+        };
+
+        // Add touch handler to the checkbox itself
+        checkbox.addEventListener('touchstart', toggleCheckbox);
+
+        // Add touch handler to label if it exists
+        if (label) {
+            label.addEventListener('touchstart', toggleCheckbox);
+        }
+    };
+
+    // Apply to all checkboxes
+    addCheckboxTouchHandler('invert-y-toggle');
+    addCheckboxTouchHandler('cutie-patootie-toggle');
+    addCheckboxTouchHandler('start-cutie-patootie-toggle');
+}
+
 // Show Controls button
 const showControlsBtn = document.getElementById('show-controls-btn');
 const showControls = () => {
@@ -1996,8 +2026,8 @@ showControlsBtn.addEventListener('touchstart', (e) => {
 
 // Show/hide UI elements based on device type
 if (isMobile) {
-    // Mobile: don't invert vertical controls
-    gameState.invertMouseY = false;
+    // Mobile: invert vertical controls
+    gameState.invertMouseY = true;
 
     // Show mobile controls
     document.getElementById('fire-button').style.display = 'flex';
@@ -2054,6 +2084,12 @@ if (isMobile) {
 
     // Start game with touch on start screen
     document.getElementById('start-screen').addEventListener('touchstart', (e) => {
+        // Don't start game if user tapped on checkbox or label
+        const target = e.target;
+        if (target.tagName === 'INPUT' || target.tagName === 'LABEL' || target.closest('label')) {
+            return; // Let the checkbox handle the event
+        }
+
         if (!gameState.started && !gameState.gameOver) {
             startGame();
         }
