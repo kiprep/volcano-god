@@ -2074,6 +2074,42 @@ debugConsoleBtn.addEventListener('touchstart', (e) => {
     openDebugConsole();
 });
 
+// Debug Console download button
+const debugConsoleDownloadBtn = document.getElementById('debug-console-download');
+const downloadDebugLog = () => {
+    console.log('Downloading debug log...');
+
+    // Create the log content
+    const logContent = logMessages.join('\n');
+
+    // Create a blob with the log content
+    const blob = new Blob([logContent], { type: 'text/plain' });
+
+    // Create a download link
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+
+    // Generate filename with timestamp
+    const timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];
+    a.download = `volcano-god-debug-${timestamp}.txt`;
+
+    // Trigger download
+    document.body.appendChild(a);
+    a.click();
+
+    // Cleanup
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    console.log('Debug log download initiated');
+};
+debugConsoleDownloadBtn.addEventListener('click', downloadDebugLog);
+debugConsoleDownloadBtn.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    downloadDebugLog();
+});
+
 // Debug Console close button
 const debugConsoleCloseBtn = document.getElementById('debug-console-close');
 const closeDebugConsole = () => {

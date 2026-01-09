@@ -384,8 +384,19 @@
         max-height: calc(100% - 30px);
         box-sizing: border-box;
     ">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <h2 style="color: #00ff00; margin: 0; font-size: 20px;">Debug Console</h2>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 10px;">
+            <h2 style="color: #00ff00; margin: 0; font-size: 18px; flex-grow: 1;">Debug Console</h2>
+            <button id="debug-console-download" style="
+                background: #0066cc;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 8px 15px;
+                font-size: 14px;
+                cursor: pointer;
+                flex-shrink: 0;
+                white-space: nowrap;
+            ">Download</button>
             <button id="debug-console-close" style="
                 background: #ff0000;
                 color: white;
