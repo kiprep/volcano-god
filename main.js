@@ -7,43 +7,29 @@ const debugMode = false;
 // Detect if device is mobile/touch-enabled
 const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
-// On-screen debug console for mobile
-if (isMobile) {
-    const debugConsole = document.getElementById('debug-console');
-    if (debugConsole) {
-        debugConsole.style.display = 'block';
-        const originalLog = console.log;
-        const logMessages = [];
-        const maxMessages = 20;
+// Console log collector
+const originalLog = console.log;
+const logMessages = [];
 
-        console.log = function(...args) {
-            // Call original console.log
-            originalLog.apply(console, args);
+console.log = function(...args) {
+    // Call original console.log
+    originalLog.apply(console, args);
 
-            // Add to on-screen console
-            const message = args.map(arg => {
-                if (typeof arg === 'object') {
-                    try {
-                        return JSON.stringify(arg, null, 2);
-                    } catch (e) {
-                        return String(arg);
-                    }
-                }
+    // Format and store the message
+    const message = args.map(arg => {
+        if (typeof arg === 'object') {
+            try {
+                return JSON.stringify(arg, null, 2);
+            } catch (e) {
                 return String(arg);
-            }).join(' ');
-
-            logMessages.push(message);
-            if (logMessages.length > maxMessages) {
-                logMessages.shift();
             }
+        }
+        return String(arg);
+    }).join(' ');
 
-            debugConsole.innerHTML = logMessages.map(msg =>
-                `<div style="border-bottom: 1px solid #003300; padding: 2px 0;">${msg}</div>`
-            ).join('');
-            debugConsole.scrollTop = debugConsole.scrollHeight;
-        };
-    }
-}
+    const timestamp = new Date().toLocaleTimeString();
+    logMessages.push(`[${timestamp}] ${message}`);
+};
 
 console.log('Device detection - isMobile:', isMobile);
 console.log('  - ontouchstart:', 'ontouchstart' in window);
@@ -2065,6 +2051,39 @@ settingsBtn.addEventListener('click', openSettings);
 settingsBtn.addEventListener('touchstart', (e) => {
     e.preventDefault();
     openSettings();
+});
+
+// Debug Console button
+const debugConsoleBtn = document.getElementById('debug-console-btn');
+const openDebugConsole = () => {
+    document.getElementById('pause-screen').style.display = 'none';
+    const modal = document.getElementById('debug-console-modal');
+    const textarea = document.getElementById('debug-console-text');
+
+    // Populate textarea with all logs
+    textarea.value = logMessages.join('\n');
+
+    // Scroll to bottom
+    textarea.scrollTop = textarea.scrollHeight;
+
+    modal.style.display = 'block';
+};
+debugConsoleBtn.addEventListener('click', openDebugConsole);
+debugConsoleBtn.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    openDebugConsole();
+});
+
+// Debug Console close button
+const debugConsoleCloseBtn = document.getElementById('debug-console-close');
+const closeDebugConsole = () => {
+    document.getElementById('debug-console-modal').style.display = 'none';
+    document.getElementById('pause-screen').style.display = 'block';
+};
+debugConsoleCloseBtn.addEventListener('click', closeDebugConsole);
+debugConsoleCloseBtn.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    closeDebugConsole();
 });
 
 // Settings back button
