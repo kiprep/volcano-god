@@ -71,88 +71,126 @@ window.addEventListener('DOMContentLoaded', () => {
 
 // Load sprite textures for Cutie Patootie Mode
 const textureLoader = new THREE.TextureLoader();
+
+// Track texture loading progress
+let texturesLoaded = 0;
+let totalTextures = 8; // 2 princess + 3 normal + 3 brute
+let allTexturesLoaded = false;
+
 const spriteTextures = {
     princess: [
         textureLoader.load('./assets/sprites/princess-1.png',
             (texture) => {
                 console.log('✓ Loaded princess-1.png', texture.image.width, 'x', texture.image.height);
+                texturesLoaded++;
+                checkAllTexturesLoaded();
             },
             undefined,
-            (err) => console.error('✗ Error loading princess-1.png:', err)),
+            (err) => {
+                console.error('✗ Error loading princess-1.png:', err);
+                texturesLoaded++;
+                checkAllTexturesLoaded();
+            }),
         textureLoader.load('./assets/sprites/princess-2.png',
             (texture) => {
                 console.log('✓ Loaded princess-2.png', texture.image.width, 'x', texture.image.height);
+                texturesLoaded++;
+                checkAllTexturesLoaded();
             },
             undefined,
-            (err) => console.error('✗ Error loading princess-2.png:', err))
+            (err) => {
+                console.error('✗ Error loading princess-2.png:', err);
+                texturesLoaded++;
+                checkAllTexturesLoaded();
+            })
     ],
     normal: [
         textureLoader.load('./assets/sprites/normal-1.png',
             (texture) => {
                 console.log('✓ Loaded normal-1.png', texture.image.width, 'x', texture.image.height);
+                texturesLoaded++;
+                checkAllTexturesLoaded();
             },
             undefined,
-            (err) => console.error('✗ Error loading normal-1.png:', err)),
+            (err) => {
+                console.error('✗ Error loading normal-1.png:', err);
+                texturesLoaded++;
+                checkAllTexturesLoaded();
+            }),
         textureLoader.load('./assets/sprites/normal-2.png',
             (texture) => {
                 console.log('✓ Loaded normal-2.png', texture.image.width, 'x', texture.image.height);
+                texturesLoaded++;
+                checkAllTexturesLoaded();
             },
             undefined,
-            (err) => console.error('✗ Error loading normal-2.png:', err)),
+            (err) => {
+                console.error('✗ Error loading normal-2.png:', err);
+                texturesLoaded++;
+                checkAllTexturesLoaded();
+            }),
         textureLoader.load('./assets/sprites/normal-3.png',
             (texture) => {
                 console.log('✓ Loaded normal-3.png', texture.image.width, 'x', texture.image.height);
+                texturesLoaded++;
+                checkAllTexturesLoaded();
             },
             undefined,
-            (err) => console.error('✗ Error loading normal-3.png:', err))
+            (err) => {
+                console.error('✗ Error loading normal-3.png:', err);
+                texturesLoaded++;
+                checkAllTexturesLoaded();
+            })
     ],
     brute: [
         textureLoader.load('./assets/sprites/brute-1.png',
             (texture) => {
                 console.log('✓ Loaded brute-1.png', texture.image.width, 'x', texture.image.height);
+                texturesLoaded++;
+                checkAllTexturesLoaded();
             },
             undefined,
-            (err) => console.error('✗ Error loading brute-1.png:', err)),
+            (err) => {
+                console.error('✗ Error loading brute-1.png:', err);
+                texturesLoaded++;
+                checkAllTexturesLoaded();
+            }),
         textureLoader.load('./assets/sprites/brute-2.png',
             (texture) => {
                 console.log('✓ Loaded brute-2.png', texture.image.width, 'x', texture.image.height);
+                texturesLoaded++;
+                checkAllTexturesLoaded();
             },
             undefined,
-            (err) => console.error('✗ Error loading brute-2.png:', err)),
+            (err) => {
+                console.error('✗ Error loading brute-2.png:', err);
+                texturesLoaded++;
+                checkAllTexturesLoaded();
+            }),
         textureLoader.load('./assets/sprites/brute-3.png',
             (texture) => {
                 console.log('✓ Loaded brute-3.png', texture.image.width, 'x', texture.image.height);
+                texturesLoaded++;
+                checkAllTexturesLoaded();
             },
             undefined,
-            (err) => console.error('✗ Error loading brute-3.png:', err))
+            (err) => {
+                console.error('✗ Error loading brute-3.png:', err);
+                texturesLoaded++;
+                checkAllTexturesLoaded();
+            })
     ]
 };
 
-console.log('Sprite textures initialized:', spriteTextures);
-
-// Force texture updates when they finish loading (important for mobile)
-const forceTextureUpdate = (texture) => {
-    if (texture && texture.image) {
-        texture.needsUpdate = true;
-        console.log('Forced texture update for:', texture.image.src);
+function checkAllTexturesLoaded() {
+    console.log(`Textures loaded: ${texturesLoaded}/${totalTextures}`);
+    if (texturesLoaded >= totalTextures) {
+        allTexturesLoaded = true;
+        console.log('✓ All sprite textures loaded!');
     }
-};
+}
 
-// Apply to all textures
-Object.values(spriteTextures).forEach(textureArray => {
-    textureArray.forEach(texture => {
-        // If already loaded, update now
-        if (texture.image && texture.image.complete) {
-            forceTextureUpdate(texture);
-        }
-        // Also update when image loads
-        if (texture.image) {
-            texture.image.addEventListener('load', () => {
-                forceTextureUpdate(texture);
-            });
-        }
-    });
-});
+console.log('Sprite textures initialized:', spriteTextures);
 
 // Input state
 const input = {
@@ -861,13 +899,14 @@ function createVillager(position, isPrincess = false, villageId = 1, isBrute = f
         : villagerRadius * scale * 0.72;
 
     let mesh, headMesh;
+    let useSpriteMode = gameState.cutiePatootieMode;
+    let texture; // Declare texture in outer scope
 
-    if (gameState.cutiePatootieMode) {
+    if (useSpriteMode) {
         // CUTIE PATOOTIE MODE: Use sprite
         console.log('Creating sprite for villager, isPrincess:', isPrincess, 'isBrute:', isBrute);
 
         // Select texture based on type
-        let texture;
         if (isPrincess) {
             texture = spriteTextures.princess[villageId - 1]; // Princess 1 or 2 based on village
         } else if (isBrute) {
@@ -885,6 +924,16 @@ function createVillager(position, isPrincess = false, villageId = 1, isBrute = f
         console.log('  - Image width:', texture?.image?.width);
         console.log('  - Image height:', texture?.image?.height);
 
+        // Check if texture has a valid image loaded
+        if (!texture?.image || !texture.image.complete || !texture.image.src) {
+            console.warn('⚠️  Texture not loaded yet! Falling back to 3D mode for this villager.');
+            console.warn('   All textures loaded?', allTexturesLoaded);
+            // Fall back to 3D mode for this villager only
+            useSpriteMode = false;
+        }
+    }
+
+    if (useSpriteMode) {
         // Create sprite material with transparency
         const spriteMaterial = new THREE.SpriteMaterial({
             map: texture,
