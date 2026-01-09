@@ -172,6 +172,202 @@ const input = {
     right: false,
 };
 
+// Gamepad support for Steam Deck and other controllers
+const gamepadState = {
+    connected: false,
+    gamepad: null,
+    deadzone: 0.15,  // Ignore stick movement below this threshold
+    lookSensitivity: 0.05,  // Right stick look sensitivity
+    buttonsPreviousFrame: new Array(20).fill(false),  // Track button states to detect press/release
+    lastWeaponSwitchTime: 0,
+    weaponSwitchCooldown: 300  // ms between weapon switches
+};
+
+// Standard gamepad button mapping (Xbox-style)
+const GAMEPAD_BUTTONS = {
+    A: 0,           // Fire / Start game
+    B: 1,           // (unused)
+    X: 2,           // (unused)
+    Y: 3,           // (unused)
+    LB: 4,          // Switch weapon left
+    RB: 5,          // Switch weapon right
+    LT: 6,          // (unused)
+    RT: 7,          // Fire
+    SELECT: 8,      // (unused)
+    START: 9,       // Pause/Resume
+    LS: 10,         // Left stick press (unused)
+    RS: 11,         // Right stick press (unused)
+    DPAD_UP: 12,    // (unused)
+    DPAD_DOWN: 13,  // (unused)
+    DPAD_LEFT: 14,  // Rotate left
+    DPAD_RIGHT: 15  // Rotate right
+};
+
+// Standard gamepad axes mapping
+const GAMEPAD_AXES = {
+    LEFT_STICK_X: 0,   // Free flying: strafe left/right
+    LEFT_STICK_Y: 1,   // Free flying: forward/backward
+    RIGHT_STICK_X: 2,  // Camera look horizontal
+    RIGHT_STICK_Y: 3   // Camera look vertical
+};
+
+// Apply deadzone to stick values
+function applyDeadzone(value) {
+    if (Math.abs(value) < gamepadState.deadzone) {
+        return 0;
+    }
+    // Scale the value to start from 0 at deadzone edge
+    const sign = value > 0 ? 1 : -1;
+    return sign * (Math.abs(value) - gamepadState.deadzone) / (1 - gamepadState.deadzone);
+}
+
+// Poll gamepad state and update inputs
+function updateGamepad() {
+    const gamepads = navigator.getGamepads();
+    let gamepadFound = false;
+
+    for (let i = 0; i < gamepads.length; i++) {
+        const gp = gamepads[i];
+        if (gp && gp.connected) {
+            gamepadFound = true;
+            gamepadState.gamepad = gp;
+
+            // Right stick for camera look
+            const rightX = applyDeadzone(gp.axes[GAMEPAD_AXES.RIGHT_STICK_X]);
+            const rightY = applyDeadzone(gp.axes[GAMEPAD_AXES.RIGHT_STICK_Y]);
+
+            if (rightX !== 0 || rightY !== 0) {
+                mouseX += rightX * gamepadState.lookSensitivity;
+                const yMultiplier = gameState.invertMouseY ? -1 : 1;
+                mouseY += rightY * gamepadState.lookSensitivity * yMultiplier;
+
+                // Clamp vertical look (same as mouse)
+                mouseY = Math.max(-Math.PI / 3, Math.min(Math.PI / 6, mouseY));
+            }
+
+            // Left stick for free flying movement
+            if (gameState.freeFlying) {
+                const leftX = applyDeadzone(gp.axes[GAMEPAD_AXES.LEFT_STICK_X]);
+                const leftY = applyDeadzone(gp.axes[GAMEPAD_AXES.LEFT_STICK_Y]);
+
+                input.forward = leftY < -0.3;
+                input.backward = leftY > 0.3;
+                input.left = leftX < -0.3;
+                input.right = leftX > 0.3;
+            } else {
+                // D-pad or left stick for rotation in normal mode
+                const leftX = applyDeadzone(gp.axes[GAMEPAD_AXES.LEFT_STICK_X]);
+                input.rotateLeft = leftX < -0.3 || gp.buttons[GAMEPAD_BUTTONS.DPAD_LEFT].pressed;
+                input.rotateRight = leftX > 0.3 || gp.buttons[GAMEPAD_BUTTONS.DPAD_RIGHT].pressed;
+            }
+
+            // Fire with A button or RT
+            input.fire = gp.buttons[GAMEPAD_BUTTONS.A].pressed || gp.buttons[GAMEPAD_BUTTONS.RT].pressed;
+
+            // Weapon switching with bumpers (with cooldown to prevent rapid switching)
+            const now = Date.now();
+            if (now - gamepadState.lastWeaponSwitchTime > gamepadState.weaponSwitchCooldown) {
+                // Detect button press (not held)
+                const lbPressed = gp.buttons[GAMEPAD_BUTTONS.LB].pressed;
+                const rbPressed = gp.buttons[GAMEPAD_BUTTONS.RB].pressed;
+                const lbWasPressed = gamepadState.buttonsPreviousFrame[GAMEPAD_BUTTONS.LB];
+                const rbWasPressed = gamepadState.buttonsPreviousFrame[GAMEPAD_BUTTONS.RB];
+
+                if (lbPressed && !lbWasPressed) {
+                    changeLavaType(-1);
+                    gamepadState.lastWeaponSwitchTime = now;
+                } else if (rbPressed && !rbWasPressed) {
+                    changeLavaType(1);
+                    gamepadState.lastWeaponSwitchTime = now;
+                }
+            }
+
+            // Pause with START button
+            const startPressed = gp.buttons[GAMEPAD_BUTTONS.START].pressed;
+            const startWasPressed = gamepadState.buttonsPreviousFrame[GAMEPAD_BUTTONS.START];
+            if (startPressed && !startWasPressed && gameState.started && !gameState.gameOver) {
+                // Trigger pause toggle
+                gameState.paused = !gameState.paused;
+                const pauseScreen = document.getElementById('pause-screen');
+                if (gameState.paused) {
+                    pauseScreen.style.display = 'block';
+                    if (document.pointerLockElement) {
+                        document.exitPointerLock();
+                    }
+                } else {
+                    pauseScreen.style.display = 'none';
+
+                    // Reset camera to spawn point when exiting pause
+                    if (gameState.freeFlying) {
+                        gameState.freeFlying = false;
+                        const btn = document.getElementById('free-flying-btn');
+                        btn.style.background = '#4169e1';
+                        btn.textContent = 'Toggle Free Flying Mode';
+                    }
+
+                    camera.position.set(0, cameraHeight, cameraRadius);
+                    mouseX = 0;
+                    mouseY = 0;
+                    gameState.rotation = 0;
+                }
+            }
+
+            // Start game with A button
+            const aPressed = gp.buttons[GAMEPAD_BUTTONS.A].pressed;
+            const aWasPressed = gamepadState.buttonsPreviousFrame[GAMEPAD_BUTTONS.A];
+            if (aPressed && !aWasPressed && !gameState.started && !gameState.gameOver) {
+                startGame();
+            }
+
+            // Store button states for next frame
+            for (let btn = 0; btn < gp.buttons.length; btn++) {
+                gamepadState.buttonsPreviousFrame[btn] = gp.buttons[btn].pressed;
+            }
+
+            break; // Use first connected gamepad
+        }
+    }
+
+    if (gamepadFound !== gamepadState.connected) {
+        gamepadState.connected = gamepadFound;
+        updateGamepadIndicator();
+    }
+}
+
+// Update controller indicator UI
+function updateGamepadIndicator() {
+    let indicator = document.getElementById('gamepad-indicator');
+    if (!indicator) {
+        // Create indicator if it doesn't exist
+        indicator = document.createElement('div');
+        indicator.id = 'gamepad-indicator';
+        indicator.style.cssText = 'position: fixed; top: 10px; right: 10px; background: rgba(0, 0, 0, 0.7); color: white; padding: 8px 12px; border-radius: 5px; font-size: 14px; z-index: 1000; display: none;';
+        document.body.appendChild(indicator);
+    }
+
+    if (gamepadState.connected) {
+        indicator.textContent = '🎮 Controller Connected';
+        indicator.style.display = 'block';
+    } else {
+        indicator.style.display = 'none';
+    }
+}
+
+// Gamepad connection events
+window.addEventListener('gamepadconnected', (e) => {
+    console.log('Gamepad connected:', e.gamepad.id);
+    gamepadState.connected = true;
+    gamepadState.gamepad = e.gamepad;
+    updateGamepadIndicator();
+});
+
+window.addEventListener('gamepaddisconnected', (e) => {
+    console.log('Gamepad disconnected:', e.gamepad.id);
+    gamepadState.connected = false;
+    gamepadState.gamepad = null;
+    updateGamepadIndicator();
+});
+
 // Initialize Three.js
 const scene = new THREE.Scene();
 
@@ -2418,6 +2614,9 @@ let lastTime = 0;
 
 function animate() {
     requestAnimationFrame(animate);
+
+    // Poll gamepad state every frame
+    updateGamepad();
 
     const currentTime = clock.getElapsedTime();
     const deltaTime = currentTime - lastTime;
