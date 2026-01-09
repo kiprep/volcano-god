@@ -89,12 +89,17 @@ const spritePaths = {
 
 // Function to load a single image and create a texture from it
 function loadSpriteTexture(path, category, index) {
+    console.log(`[LOAD] Starting load for: ${path} (${category}[${index}])`);
+
     return new Promise((resolve, reject) => {
         const img = new Image();
-        img.crossOrigin = 'anonymous'; // Important for CORS
+
+        // Try without CORS first for local files
+        // img.crossOrigin = 'anonymous';
 
         img.onload = () => {
-            console.log(`✓ Loaded ${path} - ${img.width}x${img.height}`);
+            console.log(`✓ LOADED ${path} - ${img.width}x${img.height}`);
+            console.log(`  Image complete: ${img.complete}, naturalWidth: ${img.naturalWidth}`);
 
             // Create Three.js texture from the loaded image
             const texture = new THREE.Texture(img);
@@ -102,20 +107,26 @@ function loadSpriteTexture(path, category, index) {
             texture.minFilter = THREE.LinearFilter;
             texture.magFilter = THREE.LinearFilter;
 
+            console.log(`  Storing in spriteTextures[${category}][${index}]`);
             spriteTextures[category][index] = texture;
+            console.log(`  spriteTextures[${category}].length is now:`, spriteTextures[category].length);
+
             texturesLoaded++;
             checkAllTexturesLoaded();
             resolve(texture);
         };
 
         img.onerror = (err) => {
-            console.error(`✗ Error loading ${path}:`, err);
+            console.error(`✗ ERROR loading ${path}:`, err);
+            console.error(`  Image src was set to: ${img.src}`);
             texturesLoaded++;
             checkAllTexturesLoaded();
             reject(err);
         };
 
+        console.log(`[LOAD] Setting img.src to: ${path}`);
         img.src = path;
+        console.log(`[LOAD] img.src is now: ${img.src}`);
     });
 }
 
