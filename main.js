@@ -6,6 +6,10 @@ const debugMode = false;
 
 // Detect if device is mobile/touch-enabled
 const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+console.log('Device detection - isMobile:', isMobile);
+console.log('  - ontouchstart:', 'ontouchstart' in window);
+console.log('  - maxTouchPoints:', navigator.maxTouchPoints);
+console.log('  - userAgent:', navigator.userAgent);
 
 // Game state
 const gameState = {
@@ -45,43 +49,85 @@ const textureLoader = new THREE.TextureLoader();
 const spriteTextures = {
     princess: [
         textureLoader.load('./assets/sprites/princess-1.png',
+            (texture) => {
+                console.log('✓ Loaded princess-1.png', texture.image.width, 'x', texture.image.height);
+            },
             undefined,
-            undefined,
-            (err) => console.error('Error loading princess-1.png:', err)),
+            (err) => console.error('✗ Error loading princess-1.png:', err)),
         textureLoader.load('./assets/sprites/princess-2.png',
+            (texture) => {
+                console.log('✓ Loaded princess-2.png', texture.image.width, 'x', texture.image.height);
+            },
             undefined,
-            undefined,
-            (err) => console.error('Error loading princess-2.png:', err))
+            (err) => console.error('✗ Error loading princess-2.png:', err))
     ],
     normal: [
         textureLoader.load('./assets/sprites/normal-1.png',
+            (texture) => {
+                console.log('✓ Loaded normal-1.png', texture.image.width, 'x', texture.image.height);
+            },
             undefined,
-            undefined,
-            (err) => console.error('Error loading normal-1.png:', err)),
+            (err) => console.error('✗ Error loading normal-1.png:', err)),
         textureLoader.load('./assets/sprites/normal-2.png',
+            (texture) => {
+                console.log('✓ Loaded normal-2.png', texture.image.width, 'x', texture.image.height);
+            },
             undefined,
-            undefined,
-            (err) => console.error('Error loading normal-2.png:', err)),
+            (err) => console.error('✗ Error loading normal-2.png:', err)),
         textureLoader.load('./assets/sprites/normal-3.png',
+            (texture) => {
+                console.log('✓ Loaded normal-3.png', texture.image.width, 'x', texture.image.height);
+            },
             undefined,
-            undefined,
-            (err) => console.error('Error loading normal-3.png:', err))
+            (err) => console.error('✗ Error loading normal-3.png:', err))
     ],
     brute: [
         textureLoader.load('./assets/sprites/brute-1.png',
+            (texture) => {
+                console.log('✓ Loaded brute-1.png', texture.image.width, 'x', texture.image.height);
+            },
             undefined,
-            undefined,
-            (err) => console.error('Error loading brute-1.png:', err)),
+            (err) => console.error('✗ Error loading brute-1.png:', err)),
         textureLoader.load('./assets/sprites/brute-2.png',
+            (texture) => {
+                console.log('✓ Loaded brute-2.png', texture.image.width, 'x', texture.image.height);
+            },
             undefined,
-            undefined,
-            (err) => console.error('Error loading brute-2.png:', err)),
+            (err) => console.error('✗ Error loading brute-2.png:', err)),
         textureLoader.load('./assets/sprites/brute-3.png',
+            (texture) => {
+                console.log('✓ Loaded brute-3.png', texture.image.width, 'x', texture.image.height);
+            },
             undefined,
-            undefined,
-            (err) => console.error('Error loading brute-3.png:', err))
+            (err) => console.error('✗ Error loading brute-3.png:', err))
     ]
 };
+
+console.log('Sprite textures initialized:', spriteTextures);
+
+// Force texture updates when they finish loading (important for mobile)
+const forceTextureUpdate = (texture) => {
+    if (texture && texture.image) {
+        texture.needsUpdate = true;
+        console.log('Forced texture update for:', texture.image.src);
+    }
+};
+
+// Apply to all textures
+Object.values(spriteTextures).forEach(textureArray => {
+    textureArray.forEach(texture => {
+        // If already loaded, update now
+        if (texture.image && texture.image.complete) {
+            forceTextureUpdate(texture);
+        }
+        // Also update when image loads
+        if (texture.image) {
+            texture.image.addEventListener('load', () => {
+                forceTextureUpdate(texture);
+            });
+        }
+    });
+});
 
 // Input state
 const input = {
@@ -807,7 +853,12 @@ function createVillager(position, isPrincess = false, villageId = 1, isBrute = f
             texture = spriteTextures.normal[randomIndex];
         }
 
-        console.log('Selected texture:', texture, 'Has image:', texture?.image, 'Loaded:', texture?.image?.complete);
+        console.log('Selected texture:', texture);
+        console.log('  - Has image:', !!texture?.image);
+        console.log('  - Image loaded:', texture?.image?.complete);
+        console.log('  - Image src:', texture?.image?.src);
+        console.log('  - Image width:', texture?.image?.width);
+        console.log('  - Image height:', texture?.image?.height);
 
         // Create sprite material with transparency
         const spriteMaterial = new THREE.SpriteMaterial({
@@ -816,14 +867,30 @@ function createVillager(position, isPrincess = false, villageId = 1, isBrute = f
             alphaTest: 0.05, // Discard pixels below 5% opacity (was 10%)
             sizeAttenuation: true, // Sprite scales with distance
         });
+
+        // Force material and texture update (especially important for mobile)
+        if (texture) {
+            texture.needsUpdate = true;
+        }
+        spriteMaterial.needsUpdate = true;
+
+        console.log('Created sprite material:', spriteMaterial);
+        console.log('  - Material map:', spriteMaterial.map);
+        console.log('  - Material visible:', spriteMaterial.visible);
+        console.log('  - Material needsUpdate:', spriteMaterial.needsUpdate);
+
         mesh = new THREE.Sprite(spriteMaterial);
         console.log('Created sprite mesh:', mesh);
+        console.log('  - Mesh type:', mesh.type);
+        console.log('  - Mesh visible:', mesh.visible);
+        console.log('  - Mesh material:', mesh.material);
 
         // Adjust sprite size: normal villagers +25%, brutes/princesses -40%
         const sizeAdjust = (isPrincess || isBrute) ? 0.6 : 1.25;
         const spriteWidth = villagerHeight * scale * 0.8 * sizeAdjust;
         const spriteHeight = villagerHeight * scale * sizeAdjust;
         mesh.scale.set(spriteWidth, spriteHeight, 1);
+        console.log('  - Sprite scale:', spriteWidth, 'x', spriteHeight);
 
         mesh.position.copy(position);
         // Position sprites lower for large villagers (princess/brute) so they glide over surface
@@ -832,7 +899,9 @@ function createVillager(position, isPrincess = false, villageId = 1, isBrute = f
         } else {
             mesh.position.y += villagerHeight * scale / 2; // Center for normal villagers
         }
+        console.log('  - Sprite position:', mesh.position.x, mesh.position.y, mesh.position.z);
         scene.add(mesh);
+        console.log('  - Sprite added to scene. Scene children count:', scene.children.length);
 
         // No separate head mesh for sprites
         headMesh = null;
