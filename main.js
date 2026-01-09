@@ -6,6 +6,45 @@ const debugMode = false;
 
 // Detect if device is mobile/touch-enabled
 const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+// On-screen debug console for mobile
+if (isMobile) {
+    const debugConsole = document.getElementById('debug-console');
+    if (debugConsole) {
+        debugConsole.style.display = 'block';
+        const originalLog = console.log;
+        const logMessages = [];
+        const maxMessages = 20;
+
+        console.log = function(...args) {
+            // Call original console.log
+            originalLog.apply(console, args);
+
+            // Add to on-screen console
+            const message = args.map(arg => {
+                if (typeof arg === 'object') {
+                    try {
+                        return JSON.stringify(arg, null, 2);
+                    } catch (e) {
+                        return String(arg);
+                    }
+                }
+                return String(arg);
+            }).join(' ');
+
+            logMessages.push(message);
+            if (logMessages.length > maxMessages) {
+                logMessages.shift();
+            }
+
+            debugConsole.innerHTML = logMessages.map(msg =>
+                `<div style="border-bottom: 1px solid #003300; padding: 2px 0;">${msg}</div>`
+            ).join('');
+            debugConsole.scrollTop = debugConsole.scrollHeight;
+        };
+    }
+}
+
 console.log('Device detection - isMobile:', isMobile);
 console.log('  - ontouchstart:', 'ontouchstart' in window);
 console.log('  - maxTouchPoints:', navigator.maxTouchPoints);
