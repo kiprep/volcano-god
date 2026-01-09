@@ -82,9 +82,9 @@ const spriteTextures = {
 
 // Sprite image paths
 const spritePaths = {
-    princess: ['./assets/sprites/princess-1.png', './assets/sprites/princess-2.png'],
-    normal: ['./assets/sprites/normal-1.png', './assets/sprites/normal-2.png', './assets/sprites/normal-3.png'],
-    brute: ['./assets/sprites/brute-1.png', './assets/sprites/brute-2.png', './assets/sprites/brute-3.png']
+    princess: ['/sprites/princess-1.png', '/sprites/princess-2.png'],
+    normal: ['/sprites/normal-1.png', '/sprites/normal-2.png', '/sprites/normal-3.png'],
+    brute: ['/sprites/brute-1.png', '/sprites/brute-2.png', '/sprites/brute-3.png']
 };
 
 // Function to load a single image and create a texture from it
