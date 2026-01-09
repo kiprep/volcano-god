@@ -117,8 +117,11 @@ function loadSpriteTexture(path, category, index) {
         };
 
         img.onerror = (err) => {
-            console.error(`✗ ERROR loading ${path}:`, err);
-            console.error(`  Image src was set to: ${img.src}`);
+            console.log(`✗ ERROR loading ${path}:`, err);
+            console.log(`  Error event:`, err);
+            console.log(`  Image src was: ${img.src}`);
+            console.log(`  Image complete: ${img.complete}`);
+            console.log(`  Image naturalWidth: ${img.naturalWidth}`);
             texturesLoaded++;
             checkAllTexturesLoaded();
             reject(err);
