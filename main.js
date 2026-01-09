@@ -793,6 +793,8 @@ function createVillager(position, isPrincess = false, villageId = 1, isBrute = f
 
     if (gameState.cutiePatootieMode) {
         // CUTIE PATOOTIE MODE: Use sprite
+        console.log('Creating sprite for villager, isPrincess:', isPrincess, 'isBrute:', isBrute);
+
         // Select texture based on type
         let texture;
         if (isPrincess) {
@@ -805,6 +807,8 @@ function createVillager(position, isPrincess = false, villageId = 1, isBrute = f
             texture = spriteTextures.normal[randomIndex];
         }
 
+        console.log('Selected texture:', texture, 'Has image:', texture?.image, 'Loaded:', texture?.image?.complete);
+
         // Create sprite material with transparency
         const spriteMaterial = new THREE.SpriteMaterial({
             map: texture,
@@ -813,6 +817,7 @@ function createVillager(position, isPrincess = false, villageId = 1, isBrute = f
             sizeAttenuation: true, // Sprite scales with distance
         });
         mesh = new THREE.Sprite(spriteMaterial);
+        console.log('Created sprite mesh:', mesh);
 
         // Adjust sprite size: normal villagers +25%, brutes/princesses -40%
         const sizeAdjust = (isPrincess || isBrute) ? 0.6 : 1.25;
@@ -1535,6 +1540,7 @@ function updateUI() {
 
 // Game over function
 function triggerGameOver() {
+    console.log('=== GAME OVER TRIGGERED ===');
     gameState.gameOver = true;
 
     // Release pointer lock so user can click buttons
@@ -1545,6 +1551,7 @@ function triggerGameOver() {
 
     // Disable pointer events on canvas so clicks pass through to UI buttons
     renderer.domElement.style.pointerEvents = 'none';
+    console.log('Canvas pointer-events set to none');
 
     // Show game over screen
     const gameOverDiv = document.createElement('div');
@@ -1560,6 +1567,7 @@ function triggerGameOver() {
     gameOverDiv.style.textAlign = 'center';
     gameOverDiv.style.fontSize = '24px';
     gameOverDiv.style.zIndex = '2000'; // Higher than everything else
+    gameOverDiv.style.pointerEvents = 'auto'; // Ensure game over div captures pointer events
 
     gameOverDiv.innerHTML = `
         <h1 style="color: #ff1493; margin-bottom: 20px;">GAME OVER</h1>
@@ -1573,6 +1581,7 @@ function triggerGameOver() {
             border: none;
             border-radius: 5px;
             cursor: pointer;
+            pointer-events: auto;
         ">Play Again</button>
         <button id="gameover-settings-btn" style="
             padding: 15px 30px;
@@ -1583,32 +1592,54 @@ function triggerGameOver() {
             border-radius: 5px;
             cursor: pointer;
             margin-left: 20px;
+            pointer-events: auto;
         ">Settings</button>
     `;
 
     document.body.appendChild(gameOverDiv);
 
+    console.log('Game over div appended to body');
+
     const restartBtn = document.getElementById('restart-btn');
+    console.log('Restart button element:', restartBtn);
+    if (restartBtn) {
+        const computedStyle = window.getComputedStyle(restartBtn);
+        console.log('Restart button computed pointer-events:', computedStyle.pointerEvents);
+        console.log('Restart button computed z-index:', computedStyle.zIndex);
+    }
 
     // Add both click and touch event listeners
     const restartGame = () => {
+        console.log('Restart game clicked!');
         location.reload(); // Simple restart - reload the page
     };
 
-    restartBtn.addEventListener('click', restartGame);
-    restartBtn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        restartGame();
-    });
+    if (restartBtn) {
+        restartBtn.addEventListener('click', restartGame);
+        console.log('Added click listener to restart button');
 
-    // Make sure buttons are clickable
-    restartBtn.style.pointerEvents = 'auto';
-    restartBtn.style.cursor = 'pointer';
-    restartBtn.focus();
+        restartBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            restartGame();
+        });
+
+        // Make sure buttons are clickable
+        restartBtn.style.pointerEvents = 'auto';
+        restartBtn.style.cursor = 'pointer';
+        restartBtn.focus();
+    }
 
     // Settings button on game over screen
     const gameoverSettingsBtn = document.getElementById('gameover-settings-btn');
+    console.log('Game over settings button element:', gameoverSettingsBtn);
+    if (gameoverSettingsBtn) {
+        const computedStyle = window.getComputedStyle(gameoverSettingsBtn);
+        console.log('Settings button computed pointer-events:', computedStyle.pointerEvents);
+        console.log('Settings button computed z-index:', computedStyle.zIndex);
+    }
+
     const openGameOverSettings = () => {
+        console.log('Game over settings clicked!');
         gameOverDiv.style.display = 'none';
         document.getElementById('settings-screen').style.display = 'block';
         settingsReturnScreen = 'game-over';
@@ -1618,6 +1649,7 @@ function triggerGameOver() {
     };
     if (gameoverSettingsBtn) {
         gameoverSettingsBtn.addEventListener('click', openGameOverSettings);
+        console.log('Added click listener to gameover settings button');
         gameoverSettingsBtn.addEventListener('touchstart', (e) => {
             e.preventDefault();
             openGameOverSettings();
@@ -1629,6 +1661,7 @@ function triggerGameOver() {
 
 // Function to start the game
 function startGame() {
+    console.log('Starting game with cutiePatootieMode:', gameState.cutiePatootieMode);
     gameState.started = true;
     document.getElementById('start-screen').style.display = 'none';
 
@@ -1965,6 +1998,7 @@ document.getElementById('cutie-patootie-toggle').addEventListener('change', (e) 
 
 // Start screen Cutie Patootie Mode toggle
 document.getElementById('start-cutie-patootie-toggle').addEventListener('change', (e) => {
+    console.log('Start screen cutie toggle changed to:', e.target.checked);
     gameState.cutiePatootieMode = e.target.checked;
     localStorage.setItem('volcano-god-cutie-mode', e.target.checked);
 
@@ -1977,12 +2011,17 @@ if (isMobile) {
     // Helper function to toggle checkbox on touch
     const addCheckboxTouchHandler = (checkboxId) => {
         const checkbox = document.getElementById(checkboxId);
+        if (!checkbox) {
+            console.error('Checkbox not found:', checkboxId);
+            return;
+        }
         const label = checkbox.closest('label') || checkbox.parentElement.querySelector('label');
 
         const toggleCheckbox = (e) => {
             e.preventDefault();
             e.stopPropagation();
             checkbox.checked = !checkbox.checked;
+            console.log('Mobile touch toggled checkbox', checkboxId, 'to:', checkbox.checked);
             // Trigger the change event manually
             checkbox.dispatchEvent(new Event('change', { bubbles: true }));
         };
