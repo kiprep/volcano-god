@@ -90,7 +90,7 @@ Stop the princesses (large red cones) from reaching the caldera at the top of th
 ## Project Structure
 ```
 volcano-god/
-├── assets/
+├── public/
 │   └── sprites/       # PNG sprite images for Cutie Patootie Mode
 │       ├── princess-1.png  # Village 1 princess
 │       ├── princess-2.png  # Village 2 princess
