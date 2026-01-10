@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as CANNON from 'cannon-es';
 
 // Debug mode
@@ -49,6 +50,7 @@ const gameState = {
     rotation: 0, // Player rotation around volcano
     rotationSpeed: 1.5, // radians per second
     cutiePatootieMode: false, // Sprite mode disabled by default
+    sculptedTrees: false, // Use custom sculpted tree model instead of procedural
     villagerKillCount: 0,
     gameOver: false,
     highestVillagerElevation: 0, // Percentage from village to win condition
@@ -61,11 +63,21 @@ if (savedCutieMode !== null) {
     gameState.cutiePatootieMode = savedCutieMode === 'true';
 }
 
-// Sync checkbox with loaded value
+// Load saved Sculpted Trees preference
+const savedSculptedTrees = localStorage.getItem('volcano-god-sculpted-trees');
+if (savedSculptedTrees !== null) {
+    gameState.sculptedTrees = savedSculptedTrees === 'true';
+}
+
+// Sync checkboxes with loaded values
 window.addEventListener('DOMContentLoaded', () => {
     const startToggle = document.getElementById('start-cutie-patootie-toggle');
     if (startToggle) {
         startToggle.checked = gameState.cutiePatootieMode;
+    }
+    const sculptedTreesToggle = document.getElementById('sculpted-trees-toggle');
+    if (sculptedTreesToggle) {
+        sculptedTreesToggle.checked = gameState.sculptedTrees;
     }
 });
 
@@ -157,6 +169,41 @@ function checkAllTexturesLoaded() {
         console.log('Sprite textures:', spriteTextures);
     }
 }
+
+// Load sculpted tree model
+let sculptedTreeModel = null;
+let sculptedTreeLoaded = false;
+
+const gltfLoader = new GLTFLoader();
+gltfLoader.load(
+    './models/palm-tree.glb',
+    (gltf) => {
+        console.log('✓ Sculpted tree model loaded successfully!');
+        sculptedTreeModel = gltf.scene;
+        sculptedTreeLoaded = true;
+
+        // Pre-process the model for instancing
+        sculptedTreeModel.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
+    },
+    (progress) => {
+        // Loading progress (optional)
+        if (progress.lengthComputable) {
+            const percentComplete = (progress.loaded / progress.total) * 100;
+            console.log(`Loading tree model: ${percentComplete.toFixed(0)}%`);
+        }
+    },
+    (error) => {
+        console.log('⚠️ Could not load sculpted tree model:', error.message);
+        console.log('Place your Nomad Sculpt export as: public/models/palm-tree.glb');
+        console.log('Falling back to procedural trees.');
+        sculptedTreeLoaded = false;
+    }
+);
 
 // Input state
 const input = {
@@ -974,6 +1021,35 @@ world.addContactMaterial(villagerGroundContact);
 function createTree(position) {
     const trunkHeight = 4.5; // Same as princess height
     const trunkRadius = 0.3;
+
+    // Check if we should use sculpted tree model
+    if (gameState.sculptedTrees && sculptedTreeLoaded && sculptedTreeModel) {
+        // Clone the loaded model for this tree instance
+        const treeClone = sculptedTreeModel.clone();
+        treeClone.position.copy(position);
+
+        // Adjust scale if needed (you can tweak this after seeing how it looks)
+        // treeClone.scale.set(1, 1, 1);
+
+        scene.add(treeClone);
+
+        // Physics - cylinder for trunk collision (same as procedural)
+        const shape = new CANNON.Cylinder(trunkRadius * 1.5, trunkRadius * 1.5, trunkHeight, 8);
+        const body = new CANNON.Body({
+            mass: 0, // Static object
+            material: treeMat,
+        });
+        body.addShape(shape);
+        body.position.copy(position);
+        body.position.y += trunkHeight / 2; // Center at surface
+        body.position.y += trunkHeight * 0.5; // Move up 50% more
+        world.addBody(body);
+
+        trees.push({ trunk: treeClone, frondGroup: null, body, position: position.clone(), isSculpted: true });
+        return;
+    }
+
+    // Otherwise, create procedural tree (original code)
     const frondLength = trunkHeight / 2; // 2.25 units
 
     // Create trunk
@@ -1040,7 +1116,7 @@ function createTree(position) {
     body.position.y += trunkHeight * 0.5; // Move up 50% more
     world.addBody(body);
 
-    trees.push({ trunk, frondGroup, body, position: position.clone() });
+    trees.push({ trunk, frondGroup, body, position: position.clone(), isSculpted: false });
 }
 
 // Create a villager (cone shape)
@@ -1951,6 +2027,7 @@ function triggerGameOver() {
         // Sync checkbox states with current settings
         document.getElementById('invert-y-toggle').checked = gameState.invertMouseY;
         document.getElementById('cutie-patootie-toggle').checked = gameState.cutiePatootieMode;
+        document.getElementById('sculpted-trees-toggle').checked = gameState.sculptedTrees;
     };
     if (gameoverSettingsBtn) {
         gameoverSettingsBtn.addEventListener('click', openGameOverSettings);
@@ -2257,6 +2334,7 @@ const openSettings = () => {
     // Sync checkbox states with current settings
     document.getElementById('invert-y-toggle').checked = gameState.invertMouseY;
     document.getElementById('cutie-patootie-toggle').checked = gameState.cutiePatootieMode;
+    document.getElementById('sculpted-trees-toggle').checked = gameState.sculptedTrees;
 };
 settingsBtn.addEventListener('click', openSettings);
 settingsBtn.addEventListener('touchstart', (e) => {
@@ -2380,6 +2458,17 @@ document.getElementById('start-cutie-patootie-toggle').addEventListener('change'
     document.getElementById('cutie-patootie-toggle').checked = e.target.checked;
 });
 
+// Sculpted Trees Mode toggle (settings screen)
+document.getElementById('sculpted-trees-toggle').addEventListener('change', (e) => {
+    gameState.sculptedTrees = e.target.checked;
+    localStorage.setItem('volcano-god-sculpted-trees', e.target.checked);
+    console.log('Sculpted trees mode:', e.target.checked);
+
+    if (e.target.checked && !sculptedTreeLoaded) {
+        console.log('⚠️ Sculpted tree model not loaded. Please add palm-tree.glb to public/models/');
+    }
+});
+
 // Mobile-specific touch handlers for checkboxes (to ensure they work on touch devices)
 if (isMobile) {
     // Helper function to toggle checkbox on touch
@@ -2413,6 +2502,7 @@ if (isMobile) {
     addCheckboxTouchHandler('invert-y-toggle');
     addCheckboxTouchHandler('cutie-patootie-toggle');
     addCheckboxTouchHandler('start-cutie-patootie-toggle');
+    addCheckboxTouchHandler('sculpted-trees-toggle');
 }
 
 // Show Controls button
