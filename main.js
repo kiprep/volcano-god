@@ -173,14 +173,19 @@ function checkAllTexturesLoaded() {
 // Load sculpted tree model
 let sculptedTreeModel = null;
 let sculptedTreeLoaded = false;
+let sculptedTreeLoadComplete = false; // True when loading finishes (success or failure)
 
 const gltfLoader = new GLTFLoader();
 gltfLoader.load(
     './models/palm-tree.glb',
     (gltf) => {
         console.log('✓ Sculpted tree model loaded successfully!');
+        console.log('GLTF data:', gltf);
+        console.log('GLTF scene:', gltf.scene);
         sculptedTreeModel = gltf.scene;
         sculptedTreeLoaded = true;
+        console.log('sculptedTreeLoaded set to:', sculptedTreeLoaded);
+        console.log('sculptedTreeModel set to:', sculptedTreeModel);
 
         // Pre-process the model for instancing
         sculptedTreeModel.traverse((child) => {
@@ -189,11 +194,22 @@ gltfLoader.load(
                 child.receiveShadow = true;
             }
         });
+        console.log('✓ Tree model pre-processing complete');
+        sculptedTreeLoadComplete = true;
+
+        // Spawn trees and hide loading screen
+        spawnTrees();
+        document.getElementById('loading-screen').style.display = 'none';
+        console.log('✓ Loading complete - game ready');
     },
     (progress) => {
-        // Loading progress (optional)
+        // Loading progress
         if (progress.lengthComputable) {
             const percentComplete = (progress.loaded / progress.total) * 100;
+            const loadingText = document.getElementById('loading-text');
+            if (loadingText) {
+                loadingText.textContent = `Loading tree model... ${percentComplete.toFixed(0)}%`;
+            }
             console.log(`Loading tree model: ${percentComplete.toFixed(0)}%`);
         }
     },
@@ -202,6 +218,12 @@ gltfLoader.load(
         console.log('Place your Nomad Sculpt export as: public/models/palm-tree.glb');
         console.log('Falling back to procedural trees.');
         sculptedTreeLoaded = false;
+        sculptedTreeLoadComplete = true;
+
+        // Spawn trees (will use procedural) and hide loading screen
+        spawnTrees();
+        document.getElementById('loading-screen').style.display = 'none';
+        console.log('✓ Loading complete - game ready (using procedural trees)');
     }
 );
 
@@ -937,21 +959,27 @@ const treeLavaContact = new CANNON.ContactMaterial(treeMat, lavaMat, {
 });
 world.addContactMaterial(treeLavaContact);
 
-// Spawn trees randomly around the island
-// Trees placed in a band from 25% to 60% of volcano radius
-const treeCount = 30;
-for (let i = 0; i < treeCount; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const minDistance = volcanoRadius * 0.25;
-    const maxDistance = volcanoRadius * 0.60;
-    const distance = minDistance + Math.random() * (maxDistance - minDistance);
+// Function to spawn trees (called after model loads)
+function spawnTrees() {
+    console.log('🌴 Spawning trees...');
+    // Trees placed in a band from 25% to 60% of volcano radius
+    const treeCount = 30;
+    for (let i = 0; i < treeCount; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const minDistance = volcanoRadius * 0.25;
+        const maxDistance = volcanoRadius * 0.60;
+        const distance = minDistance + Math.random() * (maxDistance - minDistance);
 
-    const treeX = Math.cos(angle) * distance;
-    const treeZ = Math.sin(angle) * distance;
-    const treeY = getIslandSurfaceHeight(treeX, treeZ);
+        const treeX = Math.cos(angle) * distance;
+        const treeZ = Math.sin(angle) * distance;
+        const treeY = getIslandSurfaceHeight(treeX, treeZ);
 
-    createTree(new THREE.Vector3(treeX, treeY, treeZ));
+        createTree(new THREE.Vector3(treeX, treeY, treeZ));
+    }
+    console.log('✓ Trees spawned');
 }
+
+// Trees will be spawned after the model loads (see model loading callback)
 
 // Create ground/water around volcano
 const groundGeometry = new THREE.CircleGeometry(150, 32);
@@ -1022,8 +1050,11 @@ function createTree(position) {
     const trunkHeight = 4.5; // Same as princess height
     const trunkRadius = 0.3;
 
+    console.log('[createTree] gameState.sculptedTrees:', gameState.sculptedTrees, 'sculptedTreeLoaded:', sculptedTreeLoaded, 'sculptedTreeModel exists:', !!sculptedTreeModel);
+
     // Check if we should use sculpted tree model
     if (gameState.sculptedTrees && sculptedTreeLoaded && sculptedTreeModel) {
+        console.log('[createTree] Using SCULPTED tree at position:', position);
         // Clone the loaded model for this tree instance
         const treeClone = sculptedTreeModel.clone();
         treeClone.position.copy(position);
@@ -1050,6 +1081,7 @@ function createTree(position) {
     }
 
     // Otherwise, create procedural tree (original code)
+    console.log('[createTree] Using PROCEDURAL tree at position:', position);
     const frondLength = trunkHeight / 2; // 2.25 units
 
     // Create trunk
