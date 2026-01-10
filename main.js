@@ -50,7 +50,7 @@ const gameState = {
     rotation: 0, // Player rotation around volcano
     rotationSpeed: 1.5, // radians per second
     cutiePatootieMode: false, // Sprite mode disabled by default
-    sculptedTrees: false, // Use custom sculpted tree model instead of procedural
+    sculptedTrees: true, // Use custom sculpted tree model by default (falls back to procedural if not found)
     villagerKillCount: 0,
     gameOver: false,
     highestVillagerElevation: 0, // Percentage from village to win condition
