@@ -180,12 +180,8 @@ gltfLoader.load(
     './models/palm-tree.glb',
     (gltf) => {
         console.log('✓ Sculpted tree model loaded successfully!');
-        console.log('GLTF data:', gltf);
-        console.log('GLTF scene:', gltf.scene);
         sculptedTreeModel = gltf.scene;
         sculptedTreeLoaded = true;
-        console.log('sculptedTreeLoaded set to:', sculptedTreeLoaded);
-        console.log('sculptedTreeModel set to:', sculptedTreeModel);
 
         // Pre-process the model for instancing
         sculptedTreeModel.traverse((child) => {
@@ -1050,11 +1046,8 @@ function createTree(position) {
     const trunkHeight = 4.5; // Same as princess height
     const trunkRadius = 0.3;
 
-    console.log('[createTree] gameState.sculptedTrees:', gameState.sculptedTrees, 'sculptedTreeLoaded:', sculptedTreeLoaded, 'sculptedTreeModel exists:', !!sculptedTreeModel);
-
     // Check if we should use sculpted tree model
     if (gameState.sculptedTrees && sculptedTreeLoaded && sculptedTreeModel) {
-        console.log('[createTree] Using SCULPTED tree at position:', position);
         // Clone the loaded model for this tree instance
         const treeClone = sculptedTreeModel.clone();
         treeClone.position.copy(position);
@@ -1081,7 +1074,6 @@ function createTree(position) {
     }
 
     // Otherwise, create procedural tree (original code)
-    console.log('[createTree] Using PROCEDURAL tree at position:', position);
     const frondLength = trunkHeight / 2; // 2.25 units
 
     // Create trunk
