@@ -958,6 +958,7 @@ world.addContactMaterial(treeLavaContact);
 // Function to spawn trees (called after model loads)
 function spawnTrees() {
     console.log('🌴 Spawning trees...');
+
     // Trees placed in a band from 25% to 60% of volcano radius
     const treeCount = 30;
     for (let i = 0; i < treeCount; i++) {
@@ -1050,10 +1051,16 @@ function createTree(position) {
     if (gameState.sculptedTrees && sculptedTreeLoaded && sculptedTreeModel) {
         // Clone the loaded model for this tree instance
         const treeClone = sculptedTreeModel.clone();
-        treeClone.position.copy(position);
 
-        // Adjust scale if needed (you can tweak this after seeing how it looks)
-        // treeClone.scale.set(1, 1, 1);
+        // Set scale (adjust this value to your liking)
+        const treeScale = 9;
+        treeClone.scale.set(treeScale, treeScale, treeScale);
+
+        // Position the tree and lift it up so it's not buried
+        treeClone.position.copy(position);
+        // Lift trees up - adjust this multiplier to control how much they stick out
+        const liftAmount = treeScale * 0.45;
+        treeClone.position.y += liftAmount;
 
         scene.add(treeClone);
 
